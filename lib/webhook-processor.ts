@@ -1,8 +1,13 @@
 import { createAdminClient } from '@/lib/supabase-server'
+import { sendEmail } from '@/lib/email'
+import { saleRecordedEmail, founderSaleEmail } from '@/lib/email-templates'
 
 /**
  * Shared webhook processor for all payment providers
  * Handles the common logic after provider-specific parsing
+ * 
+ * SaaS Pivot: Now supports recurring commissions with billing_count
+ * enforcement and max_recurring_months cutoff.
  */
 
 interface ConversionData {
@@ -55,7 +60,11 @@ export async function processConversion(data: ConversionData): Promise<ProcessRe
         const typedProduct = product as {
             id: string
             founder_id: string
-            commission_config: { upfront_pct: number; recurring_pct?: number }
+            commission_config: {
+                upfront_pct: number
+                recurring_pct?: number
+                max_recurring_months?: number
+            }
             max_cac_limit: number | null
             is_active: boolean
         }
@@ -116,24 +125,57 @@ export async function processConversion(data: ConversionData): Promise<ProcessRe
 
         // ================================================
         // STEP 5: CHECK IF NEW OR RECURRING CUSTOMER
+        // + ENFORCE max_recurring_months
         // ================================================
         let isNewCustomer = false
+        let currentBillingCount = 0
+
         const { data: existingCustomer } = await supabase
             .from('customers')
-            .select('id')
+            .select('id, billing_count')
             .eq('product_id', productId)
             .eq('external_customer_id', externalCustomerId)
             .single()
 
         if (!existingCustomer) {
+            // NEW customer — first purchase
             isNewCustomer = true
+            currentBillingCount = 1
+
             await supabase
                 .from('customers')
                 .insert({
                     product_id: productId,
                     seller_id: typedLink.seller_id,
                     external_customer_id: externalCustomerId,
+                    status: 'active',
+                    billing_count: 1,
                 } as never)
+        } else {
+            // RECURRING customer — check billing limit
+            const typedCustomer = existingCustomer as { id: string; billing_count: number }
+            currentBillingCount = (typedCustomer.billing_count || 0) + 1
+
+            const maxMonths = typedProduct.commission_config.max_recurring_months || 12
+
+            if (typedCustomer.billing_count >= maxMonths) {
+                // Commission limit reached — record the sale but don't pay commission
+                console.log(`[WEBHOOK] Recurring limit reached for customer ${externalCustomerId} on product ${productId}. Billing count: ${typedCustomer.billing_count}, max: ${maxMonths}`)
+                return {
+                    success: true,
+                    message: `Recurring commission limit reached (${maxMonths} months). Sale recorded but no commission paid.`,
+                    error: 'RECURRING_LIMIT_REACHED'
+                }
+            }
+
+            // Increment billing count
+            await supabase
+                .from('customers')
+                .update({
+                    billing_count: currentBillingCount,
+                    status: 'active', // Re-activate if they were churned
+                } as never)
+                .eq('id', typedCustomer.id)
         }
 
         // ================================================
@@ -153,7 +195,42 @@ export async function processConversion(data: ConversionData): Promise<ProcessRe
         const netCommission = commissionAmount - platformFee
 
         // ================================================
-        // STEP 7: INSERT TRANSACTION
+        // STEP 7: DEDUCT FROM FOUNDER WALLET (Tier 2 founders)
+        // ================================================
+        const { data: founderProfile } = await supabase
+            .from('profiles')
+            .select('stripe_connect_id, razorpay_account_id, wallet_balance')
+            .eq('id', typedProduct.founder_id)
+            .single()
+
+        const typedFounder = founderProfile as {
+            stripe_connect_id: string | null
+            razorpay_account_id: string | null
+            wallet_balance: number
+        } | null
+
+        const isTier2 = typedFounder && !typedFounder.stripe_connect_id && !typedFounder.razorpay_account_id
+        let billingStatus: string = 'unbilled'
+
+        if (isTier2) {
+            if ((typedFounder.wallet_balance || 0) >= commissionAmount) {
+                // Deduct from wallet
+                await supabase
+                    .from('profiles')
+                    .update({
+                        wallet_balance: (typedFounder.wallet_balance || 0) - commissionAmount,
+                    } as never)
+                    .eq('id', typedProduct.founder_id)
+                billingStatus = 'billed'
+            } else {
+                // Insufficient wallet — record sale but flag
+                billingStatus = 'wallet_insufficient'
+                console.warn(`[WEBHOOK] Founder ${typedProduct.founder_id} has insufficient wallet balance for commission. Balance: ${typedFounder.wallet_balance}, Required: ${commissionAmount}`)
+            }
+        }
+
+        // ================================================
+        // STEP 8: INSERT TRANSACTION
         // ================================================
         const payoutDueDate = new Date()
         payoutDueDate.setDate(payoutDueDate.getDate() + 30)
@@ -173,6 +250,7 @@ export async function processConversion(data: ConversionData): Promise<ProcessRe
                 external_transaction_id: externalTransactionId,
                 payout_due_date: payoutDueDate.toISOString(),
                 is_recurring: !isNewCustomer,
+                billing_status: billingStatus,
             } as never)
             .select()
             .single()
@@ -183,35 +261,96 @@ export async function processConversion(data: ConversionData): Promise<ProcessRe
         }
 
         // ================================================
-        // STEP 8: CREDIT SELLER (ESCROW)
+        // STEP 9: CREDIT SELLER (ESCROW)
+        // Only if billing was successful (Tier 1 auto-split or Tier 2 wallet deducted)
         // ================================================
-        const { error: rpcError } = await supabase.rpc('lock_commission_funds' as any, {
-            p_seller_id: typedLink.seller_id,
-            p_amount: netCommission,
-        } as any)
+        if (billingStatus !== 'wallet_insufficient') {
+            const { error: rpcError } = await supabase.rpc('lock_commission_funds' as any, {
+                p_seller_id: typedLink.seller_id,
+                p_amount: netCommission,
+            } as any)
 
-        if (rpcError) {
-            // Fallback manual update
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('pending_balance, total_earnings')
-                .eq('id', typedLink.seller_id)
-                .single()
-
-            if (profile) {
-                const typedProfile = profile as { pending_balance: number; total_earnings: number }
-                await supabase
+            if (rpcError) {
+                // Fallback manual update
+                const { data: profile } = await supabase
                     .from('profiles')
-                    .update({
-                        pending_balance: (typedProfile.pending_balance || 0) + netCommission,
-                        total_earnings: (typedProfile.total_earnings || 0) + netCommission,
-                    } as never)
+                    .select('pending_balance, total_earnings')
                     .eq('id', typedLink.seller_id)
+                    .single()
+
+                if (profile) {
+                    const typedProfile = profile as { pending_balance: number; total_earnings: number }
+                    await supabase
+                        .from('profiles')
+                        .update({
+                            pending_balance: (typedProfile.pending_balance || 0) + netCommission,
+                            total_earnings: (typedProfile.total_earnings || 0) + netCommission,
+                        } as never)
+                        .eq('id', typedLink.seller_id)
+                }
             }
         }
 
         // ================================================
-        // STEP 9: LOG WEBHOOK
+        // STEP 10: SEND NOTIFICATIONS
+        // ================================================
+        try {
+            // Get product name for notification
+            const { data: productInfo } = await supabase
+                .from('products')
+                .select('name')
+                .eq('id', productId)
+                .single()
+
+            const productName = (productInfo as { name: string })?.name || 'Product'
+
+            // In-app notification for seller
+            await supabase.from('notifications').insert({
+                user_id: typedLink.seller_id,
+                type: 'new_sale',
+                title: `New sale: ₹${(netCommission / 100).toLocaleString('en-IN')} earned!`,
+                message: `You earned ₹${(netCommission / 100).toLocaleString('en-IN')} from a ${productName} sale${isNewCustomer ? '' : ` (recurring month ${currentBillingCount})`}. Funds will be available in 30 days.`,
+                metadata: { commission: netCommission, product_name: productName, is_recurring: !isNewCustomer, billing_month: currentBillingCount },
+                read: false,
+            } as never)
+
+            // Email seller
+            const sellerEmailAddr = typedLink.seller?.email
+            if (sellerEmailAddr) {
+                const { data: sellerProfile } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', typedLink.seller_id)
+                    .single()
+                const sellerName = (sellerProfile as { full_name: string })?.full_name || ''
+                await sendEmail({
+                    to: sellerEmailAddr,
+                    subject: `New sale: ₹${(netCommission / 100).toLocaleString('en-IN')} earned!`,
+                    html: saleRecordedEmail(sellerName, productName, netCommission, !isNewCustomer, currentBillingCount),
+                })
+            }
+
+            // Email founder
+            const { data: founderData } = await supabase
+                .from('profiles')
+                .select('email, full_name')
+                .eq('id', typedProduct.founder_id)
+                .single()
+            const typedFounderNotif = founderData as { email: string; full_name: string } | null
+            if (typedFounderNotif?.email) {
+                await sendEmail({
+                    to: typedFounderNotif.email,
+                    subject: `New sale on ${productName}`,
+                    html: founderSaleEmail(typedFounderNotif.full_name, productName, amount, netCommission),
+                })
+            }
+        } catch (notifError) {
+            // Don't fail the transaction if notification fails
+            console.error('[WEBHOOK] Notification error (non-fatal):', notifError)
+        }
+
+        // ================================================
+        // STEP 11: LOG WEBHOOK
         // ================================================
         await supabase
             .from('webhook_logs')
@@ -225,7 +364,7 @@ export async function processConversion(data: ConversionData): Promise<ProcessRe
 
         return {
             success: true,
-            message: 'Conversion recorded',
+            message: `Conversion recorded${!isNewCustomer ? ` (recurring month ${currentBillingCount})` : ''}`,
             transactionId: (transaction as { id: string }).id,
             commission: netCommission,
         }

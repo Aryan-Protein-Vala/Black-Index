@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     LayoutDashboard, Link2, Vault, TrendingUp, Settings,
@@ -27,16 +27,7 @@ const sidebarItems = [
     { id: "settings", label: "Settings", icon: Settings },
 ]
 
-// Mock chart data (will be real when we have more transaction history)
-const chartData = [
-    { day: "Mon", earnings: 0 },
-    { day: "Tue", earnings: 0 },
-    { day: "Wed", earnings: 0 },
-    { day: "Thu", earnings: 0 },
-    { day: "Fri", earnings: 0 },
-    { day: "Sat", earnings: 0 },
-    { day: "Sun", earnings: 0 },
-]
+// Chart data is now computed from real transactions inside OverviewTab
 
 // ============================================
 // OVERVIEW TAB
@@ -49,6 +40,38 @@ function OverviewTab({ stats, transactions }: { stats: ReturnType<typeof useDash
         time: new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }))
 
+    // Real chart data from last 7 days
+    const chartData = useMemo(() => {
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+        const result = Array.from({ length: 7 }, (_, i) => {
+            const d = new Date()
+            d.setDate(d.getDate() - (6 - i))
+            return { day: days[d.getDay()], date: d.toDateString(), earnings: 0 }
+        })
+        transactions.forEach(tx => {
+            if (tx.type !== 'sale') return
+            const txDate = new Date(tx.created_at).toDateString()
+            const match = result.find(d => d.date === txDate)
+            if (match) match.earnings += (tx.commission_amount || 0) / 100
+        })
+        return result
+    }, [transactions])
+
+    // Count active subscriptions (recurring sales with unique customer IDs)
+    const activeSubscriptions = useMemo(() => {
+        const uniqueCustomers = new Set(transactions.filter(tx => tx.is_recurring).map(tx => tx.external_customer_id))
+        return uniqueCustomers.size
+    }, [transactions])
+
+    // Projected monthly passive income
+    const projectedIncome = useMemo(() => {
+        const last30 = new Date()
+        last30.setDate(last30.getDate() - 30)
+        return transactions
+            .filter(tx => tx.is_recurring && new Date(tx.created_at) > last30)
+            .reduce((sum, tx) => sum + (tx.commission_amount || 0), 0)
+    }, [transactions])
+
     return (
         <div className="space-y-6">
             {/* Stats Row */}
@@ -59,9 +82,15 @@ function OverviewTab({ stats, transactions }: { stats: ReturnType<typeof useDash
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
             >
                 <SpotlightCard className="p-6">
-                    <p className="text-xs font-light text-muted-foreground uppercase tracking-[0.2em] mb-2">Total Earnings</p>
+                    <p className="text-xs font-light text-muted-foreground uppercase tracking-[0.2em] mb-2">Active Subscriptions</p>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-light tracking-tight">{formatCurrency(stats.totalEarnings)}</span>
+                        <span className="text-2xl font-light tracking-tight">{activeSubscriptions}</span>
+                    </div>
+                </SpotlightCard>
+                <SpotlightCard className="p-6">
+                    <p className="text-xs font-light text-muted-foreground uppercase tracking-[0.2em] mb-2">Projected Monthly Income</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-light tracking-tight">{formatCurrency(projectedIncome)}</span>
                     </div>
                 </SpotlightCard>
                 <SpotlightCard className="p-6">
@@ -253,24 +282,25 @@ function VaultTab({ copiedStates, handleCopy }: { copiedStates: Record<string, b
 
     // Filter products based on active filter
     const filteredProducts = products.filter(product => {
-        const config = product.commission_config as any
-        const commission = config?.upfront_pct || 0
         const isFoundersChoice = (product as any).is_founders_choice || false
         const isFeatured = (product as any).is_featured && (product as any).featured_until && new Date((product as any).featured_until) > new Date()
+        const category = (product as any).category || 'other'
 
         switch (activeFilter) {
             case 'featured':
                 return isFeatured
             case 'founders-choice':
                 return isFoundersChoice
-            case '50+':
-                return commission >= 50
-            case '40-50':
-                return commission >= 40 && commission < 50
-            case '30-40':
-                return commission >= 30 && commission < 40
-            case '5-30':
-                return commission >= 5 && commission < 30
+            case 'ai_saas':
+                return category === 'ai_saas'
+            case 'b2b':
+                return category === 'b2b'
+            case 'devtools':
+                return category === 'devtools'
+            case 'marketing':
+                return category === 'marketing'
+            case 'creator_tools':
+                return category === 'creator_tools'
             default:
                 return true
         }
@@ -314,10 +344,11 @@ function VaultTab({ copiedStates, handleCopy }: { copiedStates: Record<string, b
                     { id: 'all', label: 'All' },
                     { id: 'featured', label: '🌟 Featured' },
                     { id: 'founders-choice', label: "⭐ Founder's Choice" },
-                    { id: '50+', label: '50%+' },
-                    { id: '40-50', label: '40-50%' },
-                    { id: '30-40', label: '30-40%' },
-                    { id: '5-30', label: '5-30%' },
+                    { id: 'ai_saas', label: '🤖 AI SaaS' },
+                    { id: 'b2b', label: '🏢 B2B' },
+                    { id: 'devtools', label: '🛠️ DevTools' },
+                    { id: 'marketing', label: '📈 Marketing' },
+                    { id: 'creator_tools', label: '🎨 Creator Tools' },
                 ].map((filter) => (
                     <button
                         key={filter.id}

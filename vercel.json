@@ -3,6 +3,14 @@
         {
             "path": "/api/cron/billing",
             "schedule": "0 1 * * *"
+        },
+        {
+            "path": "/api/cron/release-escrow",
+            "schedule": "30 0 * * *"
+        },
+        {
+            "path": "/api/cron/wallet-check",
+            "schedule": "30 20 * * *"
         }
     ]
 }

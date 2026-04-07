@@ -4,14 +4,15 @@ import { processConversion } from '@/lib/webhook-processor'
 import crypto from 'crypto'
 
 /**
- * Razorpay Native Webhook Handler
+ * Razorpay Webhook Handler
  * POST /api/webhooks/razorpay/[productId]
  * 
- * Founders configure this URL in Razorpay Dashboard → Webhooks
- * Events: payment.captured
+ * Supported events:
+ * - subscription.charged (SaaS subscription renewals — PRIMARY)
+ * - payment.captured (one-time payments)
+ * - subscription.cancelled (churn tracking)
  * 
- * Ref tracking: Add ref_id in order notes when creating Razorpay order
- * Example: razorpay.orders.create({ notes: { ref_id: 'link-uuid' } })
+ * Ref tracking: Add ref_id in order/subscription notes
  */
 
 export async function POST(
@@ -25,13 +26,14 @@ export async function POST(
         const rawBody = await request.text()
         const payload = JSON.parse(rawBody)
 
-        // Get webhook secret from query params or product
-        const secret = request.nextUrl.searchParams.get('secret')
-
         // ================================================
-        // STEP 1: VERIFY SIGNATURE
+        // STEP 1: VERIFY RAZORPAY SIGNATURE (STRICT — NO FALLBACK)
         // ================================================
         const razorpaySignature = request.headers.get('x-razorpay-signature')
+
+        if (!razorpaySignature) {
+            return NextResponse.json({ error: 'Missing x-razorpay-signature header' }, { status: 401 })
+        }
 
         // Fetch product to get webhook_secret
         const { data: product, error: productError } = await supabase
@@ -46,22 +48,17 @@ export async function POST(
 
         const webhookSecret = (product as { webhook_secret: string }).webhook_secret
 
-        // Verify using Razorpay signature if present
-        if (razorpaySignature) {
-            const expectedSignature = crypto
-                .createHmac('sha256', webhookSecret)
-                .update(rawBody)
-                .digest('hex')
+        // Verify HMAC-SHA256 signature
+        const expectedSignature = crypto
+            .createHmac('sha256', webhookSecret)
+            .update(rawBody)
+            .digest('hex')
 
-            if (!crypto.timingSafeEqual(
-                Buffer.from(razorpaySignature),
-                Buffer.from(expectedSignature)
-            )) {
-                return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-            }
-        } else if (secret !== webhookSecret) {
-            // Fallback: verify via query param secret
-            return NextResponse.json({ error: 'Invalid secret' }, { status: 401 })
+        if (!crypto.timingSafeEqual(
+            Buffer.from(razorpaySignature),
+            Buffer.from(expectedSignature)
+        )) {
+            return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
         }
 
         // ================================================
@@ -69,41 +66,81 @@ export async function POST(
         // ================================================
         const event = payload.event
 
-        // Only process payment.captured events
-        if (event !== 'payment.captured') {
+        let refId: string | undefined
+        let externalCustomerId: string
+        let externalTransactionId: string
+        let amount: number
+        let customerEmail: string
+
+        if (event === 'subscription.charged') {
+            // =============================================
+            // SaaS SUBSCRIPTION RENEWAL (PRIMARY EVENT)
+            // Fires on every successful subscription charge
+            // =============================================
+            const subEntity = payload.payload?.subscription?.entity
+            const payEntity = payload.payload?.payment?.entity
+
+            if (!payEntity) {
+                return NextResponse.json({ error: 'Invalid subscription.charged payload' }, { status: 400 })
+            }
+
+            refId = subEntity?.notes?.ref_id
+                || payEntity?.notes?.ref_id
+                || subEntity?.notes?.refId
+                || payEntity?.notes?.refId
+
+            externalCustomerId = payEntity.email || subEntity?.customer_id || payEntity.id
+            externalTransactionId = payEntity.id // Payment ID is unique per charge
+            amount = payEntity.amount // in paise
+            customerEmail = payEntity.email || ''
+
+        } else if (event === 'payment.captured') {
+            // One-time payment
+            const paymentEntity = payload.payload?.payment?.entity
+
+            if (!paymentEntity) {
+                return NextResponse.json({ error: 'Invalid payload structure' }, { status: 400 })
+            }
+
+            const { id: paymentId, amount: payAmount, email, notes } = paymentEntity
+
+            refId = notes?.ref_id || notes?.refId || notes?.referral_id
+            externalCustomerId = email || paymentEntity.contact || paymentId
+            externalTransactionId = paymentId
+            amount = payAmount
+            customerEmail = email || ''
+
+        } else if (event === 'subscription.cancelled' || event === 'subscription.halted') {
+            // Subscription cancelled or halted — update customer status
+            const subEntity = payload.payload?.subscription?.entity
+            const customerId = subEntity?.customer_id
+
+            if (customerId) {
+                await supabase
+                    .from('customers')
+                    .update({ status: event === 'subscription.cancelled' ? 'cancelled' : 'churned' } as never)
+                    .eq('external_customer_id', customerId)
+                    .eq('product_id', productId)
+            }
+
+            return NextResponse.json({
+                message: `${event} recorded`,
+                status: 'processed'
+            })
+
+        } else {
             return NextResponse.json({
                 message: `Event ${event} ignored`,
                 status: 'skipped'
             })
         }
 
-        const paymentEntity = payload.payload?.payment?.entity
-        if (!paymentEntity) {
-            return NextResponse.json({ error: 'Invalid payload structure' }, { status: 400 })
-        }
-
-        // Extract data from Razorpay payment
-        const {
-            id: paymentId,
-            order_id: orderId,
-            amount, // in paise
-            email: customerEmail,
-            contact: customerPhone,
-            notes,
-        } = paymentEntity
-
-        // Get ref_id from notes (founder must pass this when creating order)
-        const refId = notes?.ref_id || notes?.refId || notes?.referral_id
-
         if (!refId) {
             return NextResponse.json({
-                error: 'Missing ref_id in payment notes',
-                hint: 'Add ref_id in notes when creating Razorpay order'
+                error: 'Missing ref_id in notes',
+                hint: 'Add ref_id in subscription/order notes when creating'
             }, { status: 400 })
         }
-
-        // Use email or phone as customer identifier
-        const externalCustomerId = customerEmail || customerPhone || paymentId
 
         // ================================================
         // STEP 3: PROCESS CONVERSION
@@ -112,9 +149,9 @@ export async function POST(
             productId,
             refId,
             externalCustomerId,
-            externalTransactionId: paymentId,
-            amount: amount, // Already in paise
-            customerEmail: customerEmail || '',
+            externalTransactionId,
+            amount,
+            customerEmail,
             provider: 'razorpay',
             rawPayload: payload,
         })

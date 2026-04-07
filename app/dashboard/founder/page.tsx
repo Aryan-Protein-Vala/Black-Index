@@ -55,16 +55,29 @@ function OverviewTab({ products, transactions, isLoading }: {
         .reduce((sum, t) => sum + (t.sale_amount || 0), 0)
     const activeProducts = products.filter(p => p.is_active).length
 
-    // Chart data from recent transactions
-    const chartData = [
-        { day: "Mon", sales: 0 },
-        { day: "Tue", sales: 0 },
-        { day: "Wed", sales: 0 },
-        { day: "Thu", sales: 0 },
-        { day: "Fri", sales: 0 },
-        { day: "Sat", sales: 0 },
-        { day: "Sun", sales: totalSales },
-    ]
+    // MRR: sum of recurring sale amounts from the last 30 days
+    const last30 = new Date()
+    last30.setDate(last30.getDate() - 30)
+    const mrr = transactions
+        .filter(t => t.type === "sale" && t.is_recurring && new Date(t.created_at) > last30)
+        .reduce((sum, t) => sum + (t.sale_amount || 0), 0)
+
+    // Active subscribers: unique recurring customer IDs
+    const activeSubscribers = new Set(
+        transactions.filter(t => t.is_recurring).map(t => t.external_customer_id)
+    ).size
+
+    // Real chart data from last 7 days
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const chartData = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date()
+        d.setDate(d.getDate() - (6 - i))
+        const dateStr = d.toDateString()
+        const daySales = transactions.filter(t =>
+            t.type === "sale" && new Date(t.created_at).toDateString() === dateStr
+        ).length
+        return { day: days[d.getDay()], sales: daySales }
+    })
 
     return (
         <div className="space-y-6">
@@ -86,19 +99,19 @@ function OverviewTab({ products, transactions, isLoading }: {
 
                 <SpotlightCard className="p-6">
                     <p className="text-xs font-light text-muted-foreground uppercase tracking-[0.2em] mb-2">
-                        Total Sales
+                        MRR Generated
                     </p>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-light tracking-tight">{totalSales}</span>
+                        <span className="text-2xl font-light tracking-tight">{formatCurrency(mrr)}</span>
                     </div>
                 </SpotlightCard>
 
                 <SpotlightCard className="p-6">
                     <p className="text-xs font-light text-muted-foreground uppercase tracking-[0.2em] mb-2">
-                        Total Revenue
+                        Active Subscribers
                     </p>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-light tracking-tight">{formatCurrency(totalRevenue)}</span>
+                        <span className="text-2xl font-light tracking-tight">{activeSubscribers}</span>
                     </div>
                 </SpotlightCard>
 

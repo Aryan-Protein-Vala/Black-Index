@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
+import { sendEmail } from '@/lib/email'
+import { escrowReleasedEmail } from '@/lib/email-templates'
 
 /**
  * Escrow Release Cron Job
@@ -99,6 +101,25 @@ export async function GET(request: NextRequest) {
                 successCount++
                 totalReleased += amount
                 console.log('[ESCROW RELEASE] Released ₹', amount / 100, 'for seller', sellerId)
+
+                // Send email notification
+                try {
+                    const { data: sellerData } = await supabase
+                        .from('profiles')
+                        .select('email, full_name')
+                        .eq('id', sellerId)
+                        .single()
+                    const typedSeller = sellerData as { email: string; full_name: string } | null
+                    if (typedSeller?.email) {
+                        await sendEmail({
+                            to: typedSeller.email,
+                            subject: `₹${(amount / 100).toLocaleString('en-IN')} is now withdrawable`,
+                            html: escrowReleasedEmail(typedSeller.full_name, amount),
+                        })
+                    }
+                } catch (emailErr) {
+                    console.error('[ESCROW RELEASE] Email failed for', sellerId, emailErr)
+                }
             } catch (err) {
                 console.error('[ESCROW RELEASE] Error updating seller', sellerId, err)
             }

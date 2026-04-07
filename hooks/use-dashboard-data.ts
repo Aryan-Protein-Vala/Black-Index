@@ -125,8 +125,9 @@ export function useTransactions() {
         fetchTransactions()
 
         // Set up realtime subscription
+        const channelName = `tx-${user!.id}-${Math.random().toString(36).slice(2)}`
         const channel = supabase
-            .channel(`transactions-changes-${user!.id}-${Date.now()}`)
+            .channel(channelName)
             .on(
                 'postgres_changes',
                 {

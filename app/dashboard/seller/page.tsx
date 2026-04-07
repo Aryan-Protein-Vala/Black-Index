@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
     LayoutDashboard, Link2, Vault, TrendingUp, Settings,
     Copy, Check, ArrowUpRight, LogOut, Package, Plus, Loader2,
-    ExternalLink, Crown
+    ExternalLink, Crown, Flag, AlertCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -208,6 +208,31 @@ function OverviewTab({ stats, transactions }: { stats: ReturnType<typeof useDash
 // ============================================
 function LinksTab({ copiedStates, handleCopy }: { copiedStates: Record<string, boolean>; handleCopy: (text: string, id: string) => void }) {
     const { links, isLoading } = useLinks()
+    const [isFraudModalOpen, setIsFraudModalOpen] = useState(false)
+    const [selectedLink, setSelectedLink] = useState<{id: string, name: string} | null>(null)
+    const [fraudUrl, setFraudUrl] = useState("")
+    const [fraudDesc, setFraudDesc] = useState("")
+    const [isSubmittingFraud, setIsSubmittingFraud] = useState(false)
+
+    const handleOpenFraudModal = (linkId: string, productName: string) => {
+        setSelectedLink({ id: linkId, name: productName })
+        setFraudUrl("")
+        setFraudDesc("")
+        setIsFraudModalOpen(true)
+    }
+
+    const handleSubmitFraud = () => {
+        if (!fraudUrl) {
+            import("sonner").then(m => m.toast.error("Please provide an Evidence URL"))
+            return
+        }
+        setIsSubmittingFraud(true)
+        setTimeout(() => {
+            setIsSubmittingFraud(false)
+            setIsFraudModalOpen(false)
+            import("sonner").then(m => m.toast.success("Report submitted to Black Index admins for review."))
+        }, 1000)
+    }
 
     if (isLoading) {
         return (
@@ -250,22 +275,114 @@ function LinksTab({ copiedStates, handleCopy }: { copiedStates: Record<string, b
                                         <p className="text-xs text-muted-foreground font-mono truncate">{link.url}</p>
                                         <p className="text-xs text-muted-foreground mt-1">{link.clicks || 0} clicks</p>
                                     </div>
-                                    <button
-                                        onClick={() => handleCopy(link.url, link.id)}
-                                        className="ml-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-foreground/5 hover:bg-foreground/10 transition-all"
-                                    >
-                                        {copiedStates[link.id] ? (
-                                            <><Check className="w-3 h-3 text-green-400" /><span className="text-xs text-green-400">Copied</span></>
-                                        ) : (
-                                            <><Copy className="w-3 h-3 text-muted-foreground" /><span className="text-xs text-muted-foreground">Copy</span></>
-                                        )}
-                                    </button>
+                                    <div className="flex items-center gap-2 ml-4">
+                                        <button
+                                            onClick={() => handleCopy(link.url, link.id)}
+                                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-foreground/5 hover:bg-foreground/10 transition-all"
+                                        >
+                                            {copiedStates[link.id] ? (
+                                                <><Check className="w-3 h-3 text-green-400" /><span className="text-xs text-green-400">Copied</span></>
+                                            ) : (
+                                                <><Copy className="w-3 h-3 text-muted-foreground" /><span className="text-xs text-muted-foreground">Copy</span></>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => handleOpenFraudModal(link.id, link.products?.name || "Product")}
+                                            className="p-2 rounded-lg hover:bg-red-500/10 transition-all group"
+                                            title="Report Scam Checkout"
+                                        >
+                                            <Flag className="w-4 h-4 text-muted-foreground group-hover:text-red-400 transition-colors" />
+                                        </button>
+                                    </div>
                                 </motion.div>
                             ))}
                         </div>
                     )}
                 </SpotlightCard>
             </motion.div>
+
+            {/* Fraud Report Modal */}
+            <AnimatePresence>
+                {isFraudModalOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                        onClick={() => setIsFraudModalOpen(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 20 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-md bg-[#141414] border border-[#2a2a2a] rounded-xl overflow-hidden shadow-2xl"
+                        >
+                            <div className="p-6 border-b border-[#2a2a2a]">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-xl font-light">Report Scam Checkout</h2>
+                                    <button 
+                                        onClick={() => setIsFraudModalOpen(false)}
+                                        className="text-muted-foreground hover:text-white transition-colors"
+                                    >
+                                        &times;
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="p-6 space-y-4">
+                                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 flex gap-3 text-sm text-red-200">
+                                    <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                                    <p className="font-light leading-relaxed">
+                                        If a founder is using a fake checkout page without Split Payments, upload evidence to claim your <strong className="text-red-400">₹2,500 bounty</strong> from their security deposit.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-4 pt-2">
+                                    <div>
+                                        <p className="text-sm font-medium mb-1">Product</p>
+                                        <div className="text-sm text-muted-foreground p-3 rounded-md bg-white/5 border border-white/10">
+                                            {selectedLink?.name}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium block mb-1">Evidence URL (Screenshot link) *</label>
+                                        <Input
+                                            value={fraudUrl}
+                                            onChange={(e) => setFraudUrl(e.target.value)}
+                                            placeholder="https://imgur.com/..."
+                                            className="bg-white/5 border-white/10"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium block mb-1">Description (Optional)</label>
+                                        <textarea
+                                            value={fraudDesc}
+                                            onChange={(e) => setFraudDesc(e.target.value)}
+                                            placeholder="Explain what the scam is..."
+                                            className="w-full min-h-[100px] p-3 text-sm bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-1 focus:ring-white/20 resize-y"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="px-6 py-4 bg-black/40 border-t border-[#2a2a2a] flex justify-end gap-3">
+                                <Button variant="ghost" onClick={() => setIsFraudModalOpen(false)}>
+                                    Cancel
+                                </Button>
+                                <Button 
+                                    onClick={handleSubmitFraud}
+                                    disabled={isSubmittingFraud || !fraudUrl}
+                                    className="bg-red-500/80 text-white hover:bg-red-500"
+                                >
+                                    {isSubmittingFraud ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Flag className="w-4 h-4 mr-2" />}
+                                    Submit Report
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

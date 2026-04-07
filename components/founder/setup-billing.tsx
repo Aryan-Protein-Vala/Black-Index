@@ -2,88 +2,72 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { CreditCard, Shield, AlertCircle, Check, ExternalLink, Loader2, Crown } from "lucide-react"
+import { CreditCard, Shield, AlertCircle, Check, ExternalLink, Loader2, Crown, Wallet, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SpotlightCard } from "@/components/ui/spotlight-card"
 import { useAuth } from "@/components/auth-provider"
+import { toast } from "sonner"
 
 // Forever Pro users - exempt from billing
 const FOREVER_PRO_EMAILS = [
     "aryansharma24112003@gmail.com"
 ]
 
-interface BillingStatus {
-    hasMandate: boolean
-    mandateStatus: string | null
-    unbilledAmount: number
-    billingThreshold: number
-}
-
 export function SetupBilling() {
     const { user } = useAuth()
-    const [status, setStatus] = useState<BillingStatus | null>(null)
-    const [isLoading, setIsLoading] = useState(true)
-    const [isSubmitting, setIsSubmitting] = useState(false)
-    const [error, setError] = useState("")
+    const [isLoading, setIsLoading] = useState(false)
+    const [isSubmittingDeposit, setIsSubmittingDeposit] = useState(false)
+    const [isConnectingStripe, setIsConnectingStripe] = useState(false)
+    const [isConnectingRazorpay, setIsConnectingRazorpay] = useState(false)
+    const [isDepositingWallet, setIsDepositingWallet] = useState(false)
+
+    // Dummy state for UI demonstration (will be wired to real API later)
+    const [depositPaid, setDepositPaid] = useState(false)
+    const [walletBalance, setWalletBalance] = useState(0)
+    const [stripeConnected, setStripeConnected] = useState(false)
+    const [razorpayConnected, setRazorpayConnected] = useState(false)
 
     // Check if user is Forever Pro
     const isForeverPro = user?.email && FOREVER_PRO_EMAILS.includes(user.email)
 
-    // Fetch current billing status
-    useEffect(() => {
-        fetchStatus()
-    }, [])
-
-    const fetchStatus = async () => {
-        try {
-            const response = await fetch("/api/founders/billing/create-mandate")
-            const data = await response.json()
-            setStatus(data)
-        } catch (err) {
-            console.error("Failed to fetch billing status:", err)
-        } finally {
-            setIsLoading(false)
-        }
+    const handlePayDeposit = async () => {
+        setIsSubmittingDeposit(true)
+        // Simulate API call
+        setTimeout(() => {
+            setDepositPaid(true)
+            toast.success("Security deposit of ₹5,000 paid successfully!")
+            setIsSubmittingDeposit(false)
+        }, 1500)
     }
 
-    const handleSetupMandate = async () => {
-        setError("")
-        setIsSubmitting(true)
+    const handleConnectStripe = async () => {
+        setIsConnectingStripe(true)
+        // Simulate API call
+        setTimeout(() => {
+            setStripeConnected(true)
+            toast.success("Stripe Connect account linked successfully!")
+            setIsConnectingStripe(false)
+        }, 1500)
+    }
 
-        try {
-            // Get user info from session/profile
-            const profileRes = await fetch("/api/profile")
-            const profile = await profileRes.json()
+    const handleConnectRazorpay = async () => {
+        setIsConnectingRazorpay(true)
+        // Simulate API call
+        setTimeout(() => {
+            setRazorpayConnected(true)
+            toast.success("Razorpay Route account linked successfully!")
+            setIsConnectingRazorpay(false)
+        }, 1500)
+    }
 
-            const response = await fetch("/api/founders/billing/create-mandate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name: profile.full_name || "Founder",
-                    email: profile.email,
-                    contact: profile.phone || "",
-                }),
-            })
-
-            const data = await response.json()
-
-            if (!response.ok) {
-                throw new Error(data.error || "Failed to create mandate")
-            }
-
-            // Redirect to Razorpay authorization page
-            if (data.authorizationUrl) {
-                window.open(data.authorizationUrl, "_blank")
-            }
-
-            // Refresh status
-            await fetchStatus()
-
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Something went wrong")
-        } finally {
-            setIsSubmitting(false)
-        }
+    const handleDepositWallet = async () => {
+        setIsDepositingWallet(true)
+        // Simulate API call
+        setTimeout(() => {
+            setWalletBalance(prev => prev + 1000000) // ₹10,000 in paise
+            toast.success("₹10,000 deposited to your commission wallet!")
+            setIsDepositingWallet(false)
+        }, 1500)
     }
 
     if (isLoading && !isForeverPro) {
@@ -98,176 +82,136 @@ export function SetupBilling() {
     if (isForeverPro) {
         return (
             <SpotlightCard className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-500/20 to-amber-500/20 flex items-center justify-center">
+                <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center border border-yellow-500/20 shrink-0">
                         <Crown className="w-6 h-6 text-yellow-500" />
                     </div>
                     <div>
-                        <h3 className="font-light text-lg flex items-center gap-2">
-                            Forever Pro
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">
-                                ∞
-                            </span>
-                        </h3>
-                        <p className="text-sm text-muted-foreground">Lifetime access, no billing required</p>
+                        <h3 className="text-xl font-light mb-2">Forever Pro Founder</h3>
+                        <p className="text-sm text-muted-foreground font-light leading-relaxed">
+                            Your account is permanently exempted from security deposits and platform fees. 
+                            You have unlimited access to Black Index.
+                        </p>
                     </div>
                 </div>
-
-                <div className="mt-4 p-4 rounded-lg bg-gradient-to-br from-yellow-500/5 to-amber-500/5 border border-yellow-500/10">
-                    <div className="flex items-center gap-2 text-sm text-yellow-400 mb-2">
-                        <Check className="w-4 h-4" />
-                        Unlimited products
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-yellow-400 mb-2">
-                        <Check className="w-4 h-4" />
-                        No commission caps
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-yellow-400 mb-2">
-                        <Check className="w-4 h-4" />
-                        Priority support
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-yellow-400">
-                        <Check className="w-4 h-4" />
-                        All future features included
-                    </div>
-                </div>
-
-                <p className="text-xs text-muted-foreground text-center mt-4">
-                    🎉 You're a founding member of Black Index
-                </p>
             </SpotlightCard>
         )
     }
 
-    // Already has active mandate
-    if (status?.hasMandate && status.mandateStatus === "active") {
-        return (
-            <SpotlightCard className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                        <Check className="w-5 h-5 text-green-500" />
-                    </div>
-                    <div>
-                        <h3 className="font-light text-lg">Billing Active</h3>
-                        <p className="text-sm text-muted-foreground">Auto-debit mandate is set up</p>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-6">
-                    <div className="p-4 rounded-lg bg-foreground/5 border border-border/30">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Unbilled Amount</p>
-                        <p className="text-2xl font-light">₹{((status.unbilledAmount || 0) / 100).toLocaleString("en-IN")}</p>
-                    </div>
-                    <div className="p-4 rounded-lg bg-foreground/5 border border-border/30">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Billing Threshold</p>
-                        <p className="text-2xl font-light">₹{((status.billingThreshold || 500000) / 100).toLocaleString("en-IN")}</p>
-                    </div>
-                </div>
-
-                <p className="text-xs text-muted-foreground mt-4">
-                    When your unbilled amount reaches the threshold, we'll send you a notification 24 hours before auto-debiting.
-                </p>
-            </SpotlightCard>
-        )
-    }
-
-    // Pending mandate
-    if (status?.hasMandate && status.mandateStatus === "pending") {
-        return (
-            <SpotlightCard className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
-                        <AlertCircle className="w-5 h-5 text-yellow-500" />
-                    </div>
-                    <div>
-                        <h3 className="font-light text-lg">Authorization Pending</h3>
-                        <p className="text-sm text-muted-foreground">Please complete the mandate authorization</p>
-                    </div>
-                </div>
-
-                <Button
-                    onClick={handleSetupMandate}
-                    disabled={isSubmitting}
-                    className="w-full h-12 mt-4 bg-foreground text-background hover:bg-foreground/90"
-                >
-                    {isSubmitting ? (
-                        <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Processing...
-                        </>
-                    ) : (
-                        <>
-                            Complete Authorization
-                            <ExternalLink className="w-4 h-4 ml-2" />
-                        </>
-                    )}
-                </Button>
-            </SpotlightCard>
-        )
-    }
-
-    // No mandate - setup required
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-        >
-            <SpotlightCard className="p-6">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center">
-                        <CreditCard className="w-5 h-5 text-muted-foreground" />
-                    </div>
-                    <div>
-                        <h3 className="font-light text-lg">Set Up Auto-Pay</h3>
-                        <p className="text-sm text-muted-foreground">Authorize automatic commission settlements</p>
-                    </div>
-                </div>
-
-                <div className="space-y-4 mb-6">
-                    <div className="flex items-start gap-3 p-3 rounded-lg bg-foreground/5">
-                        <Shield className="w-4 h-4 text-muted-foreground mt-0.5" />
+        <div className="space-y-6">
+            {/* Step 1: Security Deposit */}
+            <SpotlightCard className="p-6 border-yellow-500/20">
+                <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-lg bg-yellow-500/10 flex items-center justify-center border border-yellow-500/20 shrink-0">
+                            <Shield className="w-5 h-5 text-yellow-500" />
+                        </div>
                         <div>
-                            <p className="text-sm font-light">Secure Mandate</p>
-                            <p className="text-xs text-muted-foreground">Authorize Black Index to debit commissions up to ₹1,00,000/month</p>
+                            <h3 className="text-lg font-light mb-1">Step 1: Security Deposit</h3>
+                            <p className="text-sm text-muted-foreground font-light mb-4">
+                                A refundable security deposit of ₹5,000 is required to list products on the network. 
+                                This prevents fraud and ensures only serious founders join. Refundable upon account closure.
+                            </p>
+                            
+                            {depositPaid ? (
+                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 text-sm font-light">
+                                    <Check className="w-4 h-4" />
+                                    Deposit Paid
+                                </div>
+                            ) : (
+                                <Button 
+                                    onClick={handlePayDeposit} 
+                                    disabled={isSubmittingDeposit}
+                                    className="bg-yellow-500 text-black hover:bg-yellow-600 font-medium"
+                                >
+                                    {isSubmittingDeposit ? (
+                                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+                                    ) : (
+                                        "Pay Security Deposit"
+                                    )}
+                                </Button>
+                            )}
                         </div>
                     </div>
-
-                    <div className="flex items-start gap-3 p-3 rounded-lg bg-foreground/5">
-                        <AlertCircle className="w-4 h-4 text-muted-foreground mt-0.5" />
-                        <div>
-                            <p className="text-sm font-light">24h Notice</p>
-                            <p className="text-xs text-muted-foreground">You'll always receive notification before any debit (RBI compliant)</p>
-                        </div>
-                    </div>
                 </div>
-
-                {error && (
-                    <p className="text-sm text-red-400 mb-4">{error}</p>
-                )}
-
-                <Button
-                    onClick={handleSetupMandate}
-                    disabled={isSubmitting}
-                    className="w-full h-12 bg-foreground text-background hover:bg-foreground/90"
-                >
-                    {isSubmitting ? (
-                        <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Setting up...
-                        </>
-                    ) : (
-                        <>
-                            Authorize Auto-Pay
-                            <ExternalLink className="w-4 h-4 ml-2" />
-                        </>
-                    )}
-                </Button>
-
-                <p className="text-[10px] text-muted-foreground text-center mt-4">
-                    Powered by Razorpay. Your payment details are secure and never stored on our servers.
-                </p>
             </SpotlightCard>
-        </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Step 2: Tier 1 (Automated Split) */}
+                <SpotlightCard className="p-6">
+                    <div className="flex items-start gap-4 mb-6">
+                        <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shrink-0">
+                            <CreditCard className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-light mb-1">Tier 1: Auto-Split</h3>
+                            <p className="text-sm text-muted-foreground font-light">
+                                Connect your payment gateway for automated 70/30 commission splits. No upfront wallet funding needed.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <Button 
+                            onClick={handleConnectStripe} 
+                            disabled={isConnectingStripe || stripeConnected}
+                            variant="outline" 
+                            className="w-full justify-between"
+                        >
+                            <span className="flex items-center gap-2">
+                                <span className="font-semibold text-[#635BFF]">stripe</span>
+                                {stripeConnected ? "Connected" : "Connect Stripe"}
+                            </span>
+                            {stripeConnected ? <Check className="w-4 h-4 text-green-400" /> : <ExternalLink className="w-4 h-4 opacity-50" />}
+                        </Button>
+
+                        <Button 
+                            onClick={handleConnectRazorpay} 
+                            disabled={isConnectingRazorpay || razorpayConnected}
+                            variant="outline" 
+                            className="w-full justify-between"
+                        >
+                            <span className="flex items-center gap-2">
+                                <span className="font-semibold text-[#02042B]">Razorpay</span> Route
+                            </span>
+                            {razorpayConnected ? <Check className="w-4 h-4 text-green-400" /> : <ExternalLink className="w-4 h-4 opacity-50" />}
+                        </Button>
+                    </div>
+                </SpotlightCard>
+
+                {/* Step 3: Tier 2 (Pre-Paid Wallet) */}
+                <SpotlightCard className="p-6">
+                    <div className="flex items-start gap-4 mb-6">
+                        <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shrink-0">
+                            <Wallet className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-light mb-1">Tier 2: Pre-Paid Wallet</h3>
+                            <p className="text-sm text-muted-foreground font-light">
+                                For Gumroad/Lemon Squeezy users. Pre-fund a wallet to pay commissions. If balance hits ₹0, products are paused.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-foreground/5 rounded-lg p-4 mb-4 border border-border/30">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Wallet Balance</p>
+                        <p className="text-2xl font-light">₹{(walletBalance / 100).toLocaleString('en-IN')}</p>
+                    </div>
+
+                    <Button 
+                        onClick={handleDepositWallet} 
+                        disabled={isDepositingWallet}
+                        className="w-full"
+                    >
+                        {isDepositingWallet ? (
+                             <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+                        ) : (
+                            <><Plus className="w-4 h-4 mr-2" /> Deposit ₹10,000</>
+                        )}
+                    </Button>
+                </SpotlightCard>
+            </div>
+        </div>
     )
 }

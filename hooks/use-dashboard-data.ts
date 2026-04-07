@@ -109,7 +109,7 @@ export function useTransactions() {
                 const { data, error } = await supabase
                     .from('transactions')
                     .select('*')
-                    .eq('seller_id', user.id)
+                    .eq('seller_id', user!.id)
                     .order('created_at', { ascending: false })
                     .limit(50)
 
@@ -126,14 +126,14 @@ export function useTransactions() {
 
         // Set up realtime subscription
         const channel = supabase
-            .channel('transactions-changes')
+            .channel(`transactions-changes-${user!.id}-${Date.now()}`)
             .on(
                 'postgres_changes',
                 {
                     event: 'INSERT',
                     schema: 'public',
                     table: 'transactions',
-                    filter: `seller_id=eq.${user.id}`,
+                    filter: `seller_id=eq.${user!.id}`,
                 },
                 (payload) => {
                     setTransactions(prev => [payload.new as Transaction, ...prev])
@@ -145,7 +145,7 @@ export function useTransactions() {
                     event: 'UPDATE',
                     schema: 'public',
                     table: 'transactions',
-                    filter: `seller_id=eq.${user.id}`,
+                    filter: `seller_id=eq.${user!.id}`,
                 },
                 (payload) => {
                     setTransactions(prev =>

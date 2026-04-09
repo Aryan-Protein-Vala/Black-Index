@@ -11,9 +11,11 @@ import { Footer } from "@/components/sections/footer"
 export default function MainSitePage() {
     return (
         <div className="relative">
-            <VerticalNav />
+            <div className="hidden md:block">
+                <VerticalNav />
+            </div>
 
-            <main className="ml-20 lg:ml-56">
+            <main className="md:ml-20 lg:ml-56">
                 <HeroSection />
                 <OverviewSection />
                 <HowItWorksSection />

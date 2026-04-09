@@ -59,7 +59,7 @@ export function EarningsSection() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="relative"
           >
-            <p className="text-6xl md:text-8xl lg:text-9xl font-light tracking-tighter">
+            <p className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-light tracking-tighter">
               <AnimatedNumber value={1000000} prefix="₹" />
               <span className="text-muted-foreground">+</span>
             </p>

@@ -291,7 +291,7 @@ export default function EarlyAccessPage() {
                         viewport={{ once: true }}
                         transition={{ duration: 0.6, delay: 0.2 }}
                     >
-                        <p className="text-6xl md:text-8xl lg:text-9xl font-light tracking-tighter">
+                        <p className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-light tracking-tighter">
                             <AnimatedNumber value={1000000} prefix="₹" />
                             <span className="text-muted-foreground">+</span>
                         </p>
@@ -303,7 +303,7 @@ export default function EarlyAccessPage() {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ duration: 0.5, delay: 0.4 }}
-                        className="mt-16 flex items-center justify-center gap-8 text-sm font-light text-muted-foreground"
+                        className="mt-16 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-sm font-light text-muted-foreground"
                     >
                         <span className="flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-foreground/50" />
@@ -365,17 +365,17 @@ export default function EarlyAccessPage() {
                                     </div>
 
                                     <div className="space-y-4">
-                                        <div className="flex items-center justify-between py-3 border-b border-border/30">
-                                            <span className="text-sm text-muted-foreground font-light">First month (40% upfront)</span>
-                                            <span className="text-lg font-light text-foreground">₹4,00,000</span>
+                                        <div className="flex items-center justify-between py-3 border-b border-border/30 gap-2">
+                                            <span className="text-sm text-muted-foreground font-light shrink-0">First month (40%)</span>
+                                            <span className="text-base sm:text-lg font-light text-foreground text-right">₹4,00,000</span>
                                         </div>
-                                        <div className="flex items-center justify-between py-3 border-b border-border/30">
-                                            <span className="text-sm text-muted-foreground font-light">Every month after (20% recurring)</span>
-                                            <span className="text-lg font-light text-foreground">₹2,00,000</span>
+                                        <div className="flex items-center justify-between py-3 border-b border-border/30 gap-2">
+                                            <span className="text-sm text-muted-foreground font-light shrink-0">Monthly (20%)</span>
+                                            <span className="text-base sm:text-lg font-light text-foreground text-right">₹2,00,000</span>
                                         </div>
-                                        <div className="flex items-center justify-between py-3">
-                                            <span className="text-sm font-light">Year 1 Total</span>
-                                            <span className="text-2xl font-light text-foreground">₹26,00,000</span>
+                                        <div className="flex items-center justify-between py-3 gap-2">
+                                            <span className="text-sm font-light shrink-0">Year 1 Total</span>
+                                            <span className="text-xl sm:text-2xl font-light text-foreground text-right">₹26,00,000</span>
                                         </div>
                                     </div>
 
@@ -418,17 +418,17 @@ export default function EarlyAccessPage() {
                                     </div>
 
                                     <div className="space-y-4">
-                                        <div className="flex items-center justify-between py-3 border-b border-border/30">
-                                            <span className="text-sm text-muted-foreground font-light">Total sales/month</span>
-                                            <span className="text-lg font-light text-foreground">10,000</span>
+                                        <div className="flex items-center justify-between py-3 border-b border-border/30 gap-2">
+                                            <span className="text-sm text-muted-foreground font-light shrink-0">Sales/month</span>
+                                            <span className="text-base sm:text-lg font-light text-foreground text-right">10,000</span>
                                         </div>
-                                        <div className="flex items-center justify-between py-3 border-b border-border/30">
-                                            <span className="text-sm text-muted-foreground font-light">At ₹1,000/sale</span>
-                                            <span className="text-lg font-light text-foreground">₹1,00,00,000</span>
+                                        <div className="flex items-center justify-between py-3 border-b border-border/30 gap-2">
+                                            <span className="text-sm text-muted-foreground font-light shrink-0">At ₹1,000/sale</span>
+                                            <span className="text-base sm:text-lg font-light text-foreground text-right">₹1,00,00,000</span>
                                         </div>
-                                        <div className="flex items-center justify-between py-3">
-                                            <span className="text-sm font-light">Your cost (20% commission)</span>
-                                            <span className="text-2xl font-light text-foreground">₹20,00,000</span>
+                                        <div className="flex items-center justify-between py-3 gap-2">
+                                            <span className="text-sm font-light shrink-0">Cost (20%)</span>
+                                            <span className="text-xl sm:text-2xl font-light text-foreground text-right">₹20,00,000</span>
                                         </div>
                                     </div>
 

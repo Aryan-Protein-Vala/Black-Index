@@ -39,7 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Fetch user profile via API route (bypasses RLS)
     async function fetchProfile(userId: string): Promise<Profile | null> {
         try {
-            const response = await fetch(`/api/profile?userId=${userId}`)
+            const response = await fetch(`/api/profile?userId=${userId}&t=${Date.now()}`, {
+                cache: 'no-store'
+            })
             if (!response.ok) {
                 return { id: userId, role: 'warlord' } as Profile
             }

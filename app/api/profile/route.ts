@@ -1,6 +1,8 @@
 import { createAdminClient, createServerSupabaseClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET profile
  * SECURITY: This endpoint now requires authentication.

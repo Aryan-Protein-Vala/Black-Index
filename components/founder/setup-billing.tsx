@@ -105,9 +105,12 @@ export function SetupBilling() {
 
     const handleConnectStripe = async () => {
         setIsConnectingStripe(true)
+        if (!user) {
+            setIsConnectingStripe(false)
+            return toast.error("User not found")
+        }
         try {
-            // Usually this redirects to Stripe Connect OAuth
-            window.location.href = "/api/founders/connect/stripe"
+            window.location.href = `/api/founders/connect/stripe?founder_id=${user.id}`
         } catch (err: any) {
             toast.error("Failed to connect stripe")
             setIsConnectingStripe(false)

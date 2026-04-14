@@ -75,6 +75,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
         success: true,
         message: 'Wallet credited',
-        new_balance: (currentBalance + depositAmount) / 100,
+        new_balance: currentBalance + depositAmount,
     })
 }

@@ -27,6 +27,16 @@ export function SetupBilling() {
     const [stripeConnected, setStripeConnected] = useState(false)
     const [razorpayConnected, setRazorpayConnected] = useState(false)
 
+    // Sync UI state from the real profile data (database)
+    useEffect(() => {
+        if (profile) {
+            setDepositPaid(!!profile.security_deposit_paid)
+            setWalletBalance(profile.wallet_balance || 0)
+            setStripeConnected(!!profile.stripe_connect_id)
+            setRazorpayConnected(!!profile.razorpay_account_id)
+        }
+    }, [profile])
+
     // Check if user is Forever Pro
     const isForeverPro = user?.email && FOREVER_PRO_EMAILS.includes(user.email)
 

@@ -8,9 +8,11 @@ const razorpay = new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET!,
 })
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2024-06-20' as any,
-})
+function getStripe() {
+    return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+        apiVersion: '2024-06-20' as any,
+    })
+}
 
 const SECURITY_DEPOSIT_INR = 500000 // ₹5,000 in paise
 const SECURITY_DEPOSIT_USD = 6000   // $60 in cents
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest) {
         if (currency === 'USD') {
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://blackindex.in'
 
-            const session = await stripe.checkout.sessions.create({
+            const session = await getStripe().checkout.sessions.create({
                 mode: 'payment',
                 line_items: [{
                     price_data: {

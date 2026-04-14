@@ -8,9 +8,11 @@ const razorpay = new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET!,
 })
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2024-06-20' as any,
-})
+function getStripe() {
+    return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+        apiVersion: '2024-06-20' as any,
+    })
+}
 
 const MIN_DEPOSIT_INR = 1000000 // ₹10,000 in paise
 const MIN_DEPOSIT_USD = 12000   // $120 in cents
@@ -54,7 +56,7 @@ export async function POST(request: NextRequest) {
                 .eq('id', user_id)
                 .single()
 
-            const session = await stripe.checkout.sessions.create({
+            const session = await getStripe().checkout.sessions.create({
                 mode: 'payment',
                 line_items: [{
                     price_data: {

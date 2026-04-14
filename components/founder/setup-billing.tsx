@@ -14,7 +14,7 @@ const FOREVER_PRO_EMAILS = [
 ]
 
 export function SetupBilling() {
-    const { user } = useAuth()
+    const { user, profile, refreshProfile } = useAuth()
     const [isLoading, setIsLoading] = useState(false)
     const [isSubmittingDeposit, setIsSubmittingDeposit] = useState(false)
     const [isConnectingStripe, setIsConnectingStripe] = useState(false)
@@ -80,6 +80,7 @@ export function SetupBilling() {
                         
                         toast.success("Security deposit paid successfully!");
                         setDepositPaid(true);
+                        await refreshProfile();
                     } catch (err: any) {
                         toast.error(err.message || "Failed to verify security deposit");
                     }
@@ -161,8 +162,8 @@ export function SetupBilling() {
                         if (!verifyRes.ok) throw new Error(verifyData.error || "Verification failed");
 
                         toast.success("Wallet deposited successfully!");
-                        // Use the verified server balance response if possible
                         setWalletBalance(verifyData.new_balance || (walletBalance + data.amount));
+                        await refreshProfile();
                     } catch (err: any) {
                         toast.error(err.message || "Failed to verify wallet deposit");
                     }
@@ -230,7 +231,7 @@ export function SetupBilling() {
                             {depositPaid ? (
                                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 text-sm font-light">
                                     <Check className="w-4 h-4" />
-                                    Deposit Paid
+                                    Security deposit paid
                                 </div>
                             ) : (
                                 <Button 

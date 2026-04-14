@@ -242,8 +242,7 @@ export default function SignupPage() {
                   Sign In
                 </Link>
               </p>
-
-
+            </>
           )}
         </motion.div>
       </div>

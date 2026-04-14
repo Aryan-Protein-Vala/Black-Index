@@ -193,15 +193,23 @@ export function useDashboardStats() {
     return stats
 }
 
-// Format currency (paise to rupees)
-export function formatCurrency(paise: number): string {
-    const rupees = paise / 100
+// Format currency (paise/cents to rupees/dollars)
+export function formatCurrency(smallestUnit: number, currencyCode: 'INR' | 'USD' = 'INR'): string {
+    const value = smallestUnit / 100
+    if (currencyCode === 'USD') {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+        }).format(value)
+    }
     return new Intl.NumberFormat('en-IN', {
         style: 'currency',
         currency: 'INR',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
-    }).format(rupees)
+    }).format(value)
 }
 
 // Format relative time

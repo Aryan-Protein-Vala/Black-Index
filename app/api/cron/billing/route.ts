@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 
-// SECURITY: Cron secret for Vercel Cron Jobs
-const CRON_SECRET = process.env.CRON_SECRET
-
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID!
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET!
 
@@ -18,7 +15,7 @@ const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET!
 export async function GET(request: NextRequest) {
     // Verify cron secret
     const authHeader = request.headers.get('authorization')
-    if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

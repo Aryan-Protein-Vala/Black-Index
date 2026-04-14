@@ -20,8 +20,9 @@ export function SetupBilling() {
     const [isConnectingStripe, setIsConnectingStripe] = useState(false)
     const [isConnectingRazorpay, setIsConnectingRazorpay] = useState(false)
     const [isDepositingWallet, setIsDepositingWallet] = useState(false)
+    const [region, setRegion] = useState<'india' | 'international'>('india')
 
-    // Dummy state for UI demonstration (will be wired to real API later)
+    // UI state synced from profile in useEffect below
     const [depositPaid, setDepositPaid] = useState(false)
     const [walletBalance, setWalletBalance] = useState(0)
     const [stripeConnected, setStripeConnected] = useState(false)
@@ -58,11 +59,18 @@ export function SetupBilling() {
             const res = await fetch("/api/founders/security-deposit", { 
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: user.id })
+                body: JSON.stringify({ user_id: user.id, currency: region === 'international' ? 'USD' : 'INR' })
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Failed to initiate payment")
 
+            // If backend returned a Stripe Checkout URL (international), redirect there
+            if (data.checkoutUrl) {
+                window.location.href = data.checkoutUrl
+                return
+            }
+
+            // Otherwise, proceed with Razorpay
             const isLoaded = await loadRazorpay()
             if (!isLoaded) throw new Error("Razorpay SDK failed to load")
 
@@ -141,11 +149,18 @@ export function SetupBilling() {
             const res = await fetch("/api/founders/wallet", { 
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: user.id })
+                body: JSON.stringify({ user_id: user.id, currency: region === 'international' ? 'USD' : 'INR' })
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Failed to initiate deposit")
 
+            // If backend returned a Stripe Checkout URL (international), redirect there
+            if (data.checkoutUrl) {
+                window.location.href = data.checkoutUrl
+                return
+            }
+
+            // Otherwise, proceed with Razorpay
             const isLoaded = await loadRazorpay()
             if (!isLoaded) throw new Error("Razorpay SDK failed to load")
 
@@ -224,6 +239,22 @@ export function SetupBilling() {
 
     return (
         <div className="space-y-6">
+            {/* Region Toggle */}
+            <div className="flex items-center gap-2 p-1 bg-foreground/5 rounded-lg w-fit border border-border/30">
+                <button
+                    onClick={() => setRegion('india')}
+                    className={`px-4 py-2 rounded-md text-sm font-light transition-all ${region === 'india' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                    🇮🇳 India (INR)
+                </button>
+                <button
+                    onClick={() => setRegion('international')}
+                    className={`px-4 py-2 rounded-md text-sm font-light transition-all ${region === 'international' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                    🌍 International (USD)
+                </button>
+            </div>
+
             {/* Step 1: Security Deposit */}
             <SpotlightCard className="p-6 border-yellow-500/20">
                 <div className="flex items-start justify-between">
@@ -234,7 +265,7 @@ export function SetupBilling() {
                         <div>
                             <h3 className="text-lg font-light mb-1">Step 1: Security Deposit</h3>
                             <p className="text-sm text-muted-foreground font-light mb-4">
-                                A refundable security deposit of ₹5,000 is required to list products on the network. 
+                                A refundable security deposit of {region === 'india' ? '₹5,000' : '$60'} is required to list products on the network. 
                                 This prevents fraud and ensures only serious founders join. Refundable upon account closure.
                             </p>
                             
@@ -252,7 +283,7 @@ export function SetupBilling() {
                                     {isSubmittingDeposit ? (
                                         <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
                                     ) : (
-                                        "Pay Security Deposit"
+                                        `Pay Security Deposit (${region === 'india' ? '₹5,000' : '$60'})`
                                     )}
                                 </Button>
                             )}
@@ -313,14 +344,14 @@ export function SetupBilling() {
                         <div>
                             <h3 className="text-lg font-light mb-1">Tier 2: Pre-Paid Wallet</h3>
                             <p className="text-sm text-muted-foreground font-light">
-                                For Gumroad/Lemon Squeezy users. Pre-fund a wallet to pay commissions. If balance hits ₹0, products are paused.
+                                For Gumroad/Lemon Squeezy users. Pre-fund a wallet to pay commissions. If balance hits zero, products are paused.
                             </p>
                         </div>
                     </div>
 
                     <div className="bg-foreground/5 rounded-lg p-4 mb-4 border border-border/30">
                         <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Wallet Balance</p>
-                        <p className="text-2xl font-light">₹{(walletBalance / 100).toLocaleString('en-IN')}</p>
+                        <p className="text-2xl font-light">{region === 'india' ? '₹' : '$'}{(walletBalance / 100).toLocaleString(region === 'india' ? 'en-IN' : 'en-US')}</p>
                     </div>
 
                     <Button 
@@ -331,7 +362,7 @@ export function SetupBilling() {
                         {isDepositingWallet ? (
                              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
                         ) : (
-                            <><Plus className="w-4 h-4 mr-2" /> Deposit ₹10,000</>
+                            <><Plus className="w-4 h-4 mr-2" /> Deposit {region === 'india' ? '₹10,000' : '$120'}</>
                         )}
                     </Button>
                 </SpotlightCard>

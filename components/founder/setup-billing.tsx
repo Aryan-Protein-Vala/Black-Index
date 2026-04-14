@@ -30,44 +30,119 @@ export function SetupBilling() {
     // Check if user is Forever Pro
     const isForeverPro = user?.email && FOREVER_PRO_EMAILS.includes(user.email)
 
+    const loadRazorpay = async () => {
+        return new Promise((resolve) => {
+            if ((window as any).Razorpay) resolve(true)
+            const script = document.createElement("script")
+            script.src = "https://checkout.razorpay.com/v1/checkout.js"
+            script.onload = () => resolve(true)
+            script.onerror = () => resolve(false)
+            document.body.appendChild(script)
+        })
+    }
+
     const handlePayDeposit = async () => {
+        if (!user) return
         setIsSubmittingDeposit(true)
-        // Simulate API call
-        setTimeout(() => {
-            setDepositPaid(true)
-            toast.success("Security deposit of ₹5,000 paid successfully!")
+        try {
+            const res = await fetch("/api/founders/security-deposit", { 
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: user.id })
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || "Failed to initiate payment")
+
+            const isLoaded = await loadRazorpay()
+            if (!isLoaded) throw new Error("Razorpay SDK failed to load")
+
+            const options = {
+                key: data.key_id,
+                amount: data.amount,
+                currency: data.currency,
+                name: "Black Index",
+                description: "Security Deposit",
+                order_id: data.order_id,
+                handler: async function (response: any) {
+                    toast.success("Security deposit paid successfully!")
+                    setDepositPaid(true)
+                },
+                prefill: {
+                    name: data.name || user.email,
+                    email: user.email,
+                },
+                theme: { color: "#eab308" },
+            }
+
+            const rzp = new (window as any).Razorpay(options)
+            rzp.on('payment.failed', function (response: any) {
+                toast.error(response.error.description || "Payment failed")
+            })
+            rzp.open()
+        } catch (err: any) {
+            toast.error(err.message || "Failed to pay security deposit")
+        } finally {
             setIsSubmittingDeposit(false)
-        }, 1500)
+        }
     }
 
     const handleConnectStripe = async () => {
         setIsConnectingStripe(true)
-        // Simulate API call
-        setTimeout(() => {
-            setStripeConnected(true)
-            toast.success("Stripe Connect account linked successfully!")
+        try {
+            // Usually this redirects to Stripe Connect OAuth
+            window.location.href = "/api/founders/connect/stripe"
+        } catch (err: any) {
+            toast.error("Failed to connect stripe")
             setIsConnectingStripe(false)
-        }, 1500)
+        }
     }
 
     const handleConnectRazorpay = async () => {
         setIsConnectingRazorpay(true)
-        // Simulate API call
-        setTimeout(() => {
-            setRazorpayConnected(true)
-            toast.success("Razorpay Route account linked successfully!")
-            setIsConnectingRazorpay(false)
-        }, 1500)
+        toast.info("Razorpay Route integration coming soon!")
+        setTimeout(() => setIsConnectingRazorpay(false), 1500)
     }
 
     const handleDepositWallet = async () => {
+        if (!user) return
         setIsDepositingWallet(true)
-        // Simulate API call
-        setTimeout(() => {
-            setWalletBalance(prev => prev + 1000000) // ₹10,000 in paise
-            toast.success("₹10,000 deposited to your commission wallet!")
+        try {
+            const res = await fetch("/api/founders/wallet", { 
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: user.id })
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || "Failed to initiate deposit")
+
+            const isLoaded = await loadRazorpay()
+            if (!isLoaded) throw new Error("Razorpay SDK failed to load")
+
+            const options = {
+                key: data.key_id,
+                amount: data.amount,
+                currency: data.currency,
+                name: "Black Index",
+                description: "Wallet Deposit",
+                order_id: data.order_id,
+                handler: async function (response: any) {
+                    toast.success("Wallet deposited successfully!")
+                    setWalletBalance(prev => prev + data.amount)
+                },
+                prefill: { email: user.email },
+                theme: { color: "#10b981" },
+            }
+
+            const rzp = new (window as any).Razorpay(options)
+            rzp.on('payment.failed', function (response: any) {
+                toast.error(response.error.description || "Payment failed")
+            })
+            rzp.open()
+        } catch (err: any) {
+            toast.error(err.message || "Failed to deposit wallet")
+        } finally {
             setIsDepositingWallet(false)
-        }, 1500)
+        }
     }
 
     if (isLoading && !isForeverPro) {

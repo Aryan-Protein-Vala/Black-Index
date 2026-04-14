@@ -17,6 +17,7 @@ import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 import { useProducts, useLinks, useDashboardStats, formatCurrency, useTransactions } from "@/hooks/use-dashboard-data"
 import { BecomeSellerModal } from "@/components/become-seller-modal"
+import { PayoutPopover } from "@/components/seller/payout-popover"
 
 // Tab configuration
 const sidebarItems = [
@@ -221,17 +222,48 @@ function LinksTab({ copiedStates, handleCopy }: { copiedStates: Record<string, b
         setIsFraudModalOpen(true)
     }
 
-    const handleSubmitFraud = () => {
+    const { user } = useAuth()
+    const handleSubmitFraud = async () => {
         if (!fraudUrl) {
             import("sonner").then(m => m.toast.error("Please provide an Evidence URL"))
             return
         }
+        if (!user) return
+
         setIsSubmittingFraud(true)
-        setTimeout(() => {
-            setIsSubmittingFraud(false)
+        try {
+            // Fetch founder_id of the product
+            const supabase = (await import('@/lib/supabase')).createClient()
+            const { data: linkData } = await supabase
+                .from('links')
+                .select('product_id, products(founder_id)')
+                .eq('id', selectedLink?.id)
+                .single()
+
+            const product_id = linkData?.product_id
+            const founder_id = (linkData?.products as any)?.founder_id
+
+            const res = await fetch("/api/fraud-reports", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    reporter_id: user.id,
+                    product_id: product_id,
+                    founder_id: founder_id,
+                    evidence_url: fraudUrl,
+                    description: fraudDesc
+                })
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || "Failed to submit report")
+            
             setIsFraudModalOpen(false)
             import("sonner").then(m => m.toast.success("Report submitted to Black Index admins for review."))
-        }, 1000)
+        } catch (err: any) {
+            import("sonner").then(m => m.toast.error(err.message))
+        } finally {
+            setIsSubmittingFraud(false)
+        }
     }
 
     if (isLoading) {
@@ -1127,9 +1159,12 @@ export default function UnifiedDashboard() {
                             <span className="text-border">/</span>
                             <span className="text-foreground capitalize">{activeTab === "vault" ? "The Vault" : activeTab}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                            <span className="text-[10px] text-muted-foreground font-light tracking-wide hidden sm:block">Live</span>
+                        <div className="flex items-center gap-4">
+                            <PayoutPopover balance={stats.withdrawableBalance} />
+                            <div className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                <span className="text-[10px] text-muted-foreground font-light tracking-wide hidden sm:block">Live</span>
+                            </div>
                         </div>
                     </div>
                 </motion.header>

@@ -43,6 +43,8 @@ export default function NewProductPage() {
     const [tagline, setTagline] = useState("")
     const [category, setCategory] = useState("")
     const [pricing, setPricing] = useState("")
+    const [logoFile, setLogoFile] = useState<File | null>(null)
+    const [logoPreview, setLogoPreview] = useState<string | null>(null)
     const [targetAudience, setTargetAudience] = useState("")
     const [upfrontPct, setUpfrontPct] = useState("30")
     const [recurringPct, setRecurringPct] = useState("15")
@@ -50,13 +52,12 @@ export default function NewProductPage() {
     const [maxCacLimit, setMaxCacLimit] = useState("")
 
     const categories = [
-        "SaaS / Software",
-        "Education / Courses",
-        "Health & Fitness",
-        "Finance / Investing",
-        "E-commerce",
-        "Agency / Services",
-        "Other"
+        { id: "ai_saas", label: "AI SaaS" },
+        { id: "b2b", label: "B2B" },
+        { id: "devtools", label: "DevTools" },
+        { id: "marketing", label: "Marketing" },
+        { id: "creator_tools", label: "Creator Tools" },
+        { id: "other", label: "Other" }
     ]
 
     const generateWebhookSecret = () => {
@@ -73,6 +74,21 @@ export default function NewProductPage() {
         setCopied(type)
         toast.success("Copied to clipboard!")
         setTimeout(() => setCopied(null), 2000)
+    }
+
+    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        if (file.size > 2 * 1024 * 1024) {
+            toast.error("Logo must be less than 2MB")
+            return
+        }
+        setLogoFile(file)
+        const reader = new FileReader()
+        reader.onloadend = () => {
+            setLogoPreview(reader.result as string)
+        }
+        reader.readAsDataURL(file)
     }
 
     const handleSubmit = async () => {
@@ -118,7 +134,29 @@ export default function NewProductPage() {
                 throw insertError
             }
 
-            setCreatedProductId(data?.id || null)
+            const productId = data?.id
+
+            // Upload logo if selected
+            if (logoFile && logoPreview) {
+                try {
+                    const base64Data = logoPreview.split(',')[1] // remove 'data:image/...;base64,'
+                    await fetch('/api/products/upload-logo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            product_id: productId,
+                            image_data: base64Data,
+                            file_name: logoFile.name,
+                            content_type: logoFile.type
+                        })
+                    })
+                } catch (logoErr) {
+                    console.error("Logo upload failed", logoErr)
+                    toast.error("Product created, but logo upload failed.")
+                }
+            }
+
+            setCreatedProductId(productId || null)
             toast.success("Product created! Now set up your webhook.")
             setStep(2)
         } catch (err) {
@@ -173,6 +211,23 @@ export default function NewProductPage() {
                         </div>
 
                         <div className="space-y-2">
+                            <Label htmlFor="logo">Product Logo</Label>
+                            <div className="flex items-center gap-4">
+                                {logoPreview && (
+                                    <img src={logoPreview} alt="Logo Preview" className="w-12 h-12 rounded-lg object-cover border border-border/50" />
+                                )}
+                                <Input
+                                    id="logo"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleLogoChange}
+                                    className="h-12 bg-input/30 cursor-pointer text-sm"
+                                />
+                            </div>
+                            <p className="text-xs text-muted-foreground">Max size 2MB. Square image recommended.</p>
+                        </div>
+
+                        <div className="space-y-2">
                             <Label htmlFor="website">Website URL *</Label>
                             <Input
                                 id="website"
@@ -217,7 +272,7 @@ export default function NewProductPage() {
                                 >
                                     <option value="">Select category</option>
                                     {categories.map((cat) => (
-                                        <option key={cat} value={cat}>{cat}</option>
+                                        <option key={cat.id} value={cat.id}>{cat.label}</option>
                                     ))}
                                 </select>
                             </div>
@@ -415,7 +470,7 @@ export default function NewProductPage() {
                                     <li>Go to Razorpay Dashboard → Settings → Webhooks</li>
                                     <li>Click "Add New Webhook"</li>
                                     <li>Paste the Webhook URL above</li>
-                                    <li>Select events: <code className="text-xs bg-muted/50 px-1 rounded">payment.captured</code></li>
+                                    <li>Select events: <code className="text-xs bg-muted/50 px-1 rounded">subscription.charged</code> and <code className="text-xs bg-muted/50 px-1 rounded">payment.captured</code></li>
                                     <li>Add the secret key if prompted</li>
                                     <li>Save and activate</li>
                                 </ol>
@@ -425,7 +480,7 @@ export default function NewProductPage() {
                                     <li>Go to Stripe Dashboard → Developers → Webhooks</li>
                                     <li>Click "Add endpoint"</li>
                                     <li>Paste the Webhook URL above</li>
-                                    <li>Select events: <code className="text-xs bg-muted/50 px-1 rounded">checkout.session.completed</code></li>
+                                    <li>Select events: <code className="text-xs bg-muted/50 px-1 rounded">invoice.paid</code> and <code className="text-xs bg-muted/50 px-1 rounded">checkout.session.completed</code></li>
                                     <li>Copy the signing secret and save it</li>
                                 </ol>
                             )}

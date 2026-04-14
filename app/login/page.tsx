@@ -168,10 +168,7 @@ export default function LoginPage() {
             </Link>
           </p>
 
-          <p className="mt-12 text-xs text-muted-foreground/50 text-center font-light">
-            Join 1,240 Warlords deploying sales right now.
-          </p>
-        </motion.div>
+
       </div>
     </div>
   )

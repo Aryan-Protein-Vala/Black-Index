@@ -64,8 +64,25 @@ export function SetupBilling() {
                 description: "Security Deposit",
                 order_id: data.order_id,
                 handler: async function (response: any) {
-                    toast.success("Security deposit paid successfully!")
-                    setDepositPaid(true)
+                    try {
+                        const verifyRes = await fetch("/api/founders/security-deposit/verify", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                user_id: user.id
+                            })
+                        });
+                        const verifyData = await verifyRes.json();
+                        if (!verifyRes.ok) throw new Error(verifyData.error || "Verification failed");
+                        
+                        toast.success("Security deposit paid successfully!");
+                        setDepositPaid(true);
+                    } catch (err: any) {
+                        toast.error(err.message || "Failed to verify security deposit");
+                    }
                 },
                 prefill: {
                     name: data.name || user.email,
@@ -126,8 +143,26 @@ export function SetupBilling() {
                 description: "Wallet Deposit",
                 order_id: data.order_id,
                 handler: async function (response: any) {
-                    toast.success("Wallet deposited successfully!")
-                    setWalletBalance(prev => prev + data.amount)
+                    try {
+                        const verifyRes = await fetch("/api/founders/wallet/verify", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                user_id: user.id
+                            })
+                        });
+                        const verifyData = await verifyRes.json();
+                        if (!verifyRes.ok) throw new Error(verifyData.error || "Verification failed");
+
+                        toast.success("Wallet deposited successfully!");
+                        // Use the verified server balance response if possible
+                        setWalletBalance(verifyData.new_balance || (walletBalance + data.amount));
+                    } catch (err: any) {
+                        toast.error(err.message || "Failed to verify wallet deposit");
+                    }
                 },
                 prefill: { email: user.email },
                 theme: { color: "#10b981" },

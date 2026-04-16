@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import Razorpay from 'razorpay'
-import Stripe from 'stripe'
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID!,
     key_secret: process.env.RAZORPAY_KEY_SECRET!,
 })
-
-function getStripe() {
-    return new Stripe(process.env.STRIPE_SECRET_KEY!, {
-        apiVersion: '2024-06-20' as any,
-    })
-}
 
 const MIN_DEPOSIT_INR = 1000000 // ₹10,000 in paise
 const MIN_DEPOSIT_USD = 12000   // $120 in cents
@@ -44,33 +37,59 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        // ── International (Stripe Checkout in USD) ──
+        // ── International (Lemon Squeezy Checkout in USD) ──
         if (currency === 'USD') {
             const depositAmount = amount || MIN_DEPOSIT_USD
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://blackindex.in'
 
-            // Get founder email for Stripe
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('email')
-                .eq('id', user_id)
-                .single()
-
-            const session = await getStripe().checkout.sessions.create({
-                mode: 'payment',
-                line_items: [{
-                    price_data: {
-                        currency: 'usd',
-                        product_data: { name: 'Black Index — Wallet Top-up' },
-                        unit_amount: depositAmount,
+            const lsRes = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${process.env.LEMONSQUEEZY_API_KEY}`,
+                    'Accept': 'application/vnd.api+json',
+                    'Content-Type': 'application/vnd.api+json',
+                },
+                body: JSON.stringify({
+                    data: {
+                        type: 'checkouts',
+                        attributes: {
+                            custom_price: depositAmount,
+                            product_options: {
+                                redirect_url: `${appUrl}/dashboard/founder?wallet=success`,
+                            },
+                            checkout_data: {
+                                custom: {
+                                    user_id,
+                                    type: 'wallet_topup',
+                                },
+                            },
+                        },
+                        relationships: {
+                            store: {
+                                data: {
+                                    type: 'stores',
+                                    id: process.env.LEMONSQUEEZY_STORE_ID!,
+                                },
+                            },
+                            variant: {
+                                data: {
+                                    type: 'variants',
+                                    id: process.env.LEMONSQUEEZY_VARIANT_ID!,
+                                },
+                            },
+                        },
                     },
-                    quantity: 1,
-                }],
-                metadata: { type: 'wallet_topup', founder_id: user_id },
-                customer_email: (profile as any)?.email || undefined,
-                success_url: `${appUrl}/dashboard/founder?wallet=success`,
-                cancel_url: `${appUrl}/dashboard/founder?wallet=cancelled`,
+                }),
             })
+
+            if (!lsRes.ok) {
+                const errBody = await lsRes.text()
+                console.error('Lemon Squeezy checkout error:', errBody)
+                throw new Error('Failed to create Lemon Squeezy checkout')
+            }
+
+            const lsData = await lsRes.json()
+            const checkoutUrl = lsData.data.attributes.url
 
             // Record pending deposit
             await supabase.from('founder_deposits').insert({
@@ -79,10 +98,10 @@ export async function POST(request: NextRequest) {
                 amount: depositAmount,
                 currency: 'USD',
                 status: 'pending',
-                order_id: session.id,
+                order_id: lsData.data.id,
             } as never)
 
-            return NextResponse.json({ checkoutUrl: session.url })
+            return NextResponse.json({ checkoutUrl })
         }
 
         // ── India (Razorpay in INR) ──

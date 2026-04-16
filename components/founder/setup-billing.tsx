@@ -17,7 +17,6 @@ export function SetupBilling() {
     const { user, profile, refreshProfile } = useAuth()
     const [isLoading, setIsLoading] = useState(false)
     const [isSubmittingDeposit, setIsSubmittingDeposit] = useState(false)
-    const [isConnectingStripe, setIsConnectingStripe] = useState(false)
     const [isConnectingRazorpay, setIsConnectingRazorpay] = useState(false)
     const [isDepositingWallet, setIsDepositingWallet] = useState(false)
     const [region, setRegion] = useState<'india' | 'international'>('india')
@@ -25,7 +24,6 @@ export function SetupBilling() {
     // UI state synced from profile in useEffect below
     const [depositPaid, setDepositPaid] = useState(false)
     const [walletBalance, setWalletBalance] = useState(0)
-    const [stripeConnected, setStripeConnected] = useState(false)
     const [razorpayConnected, setRazorpayConnected] = useState(false)
 
     // Sync UI state from the real profile data (database)
@@ -33,7 +31,6 @@ export function SetupBilling() {
         if (profile) {
             setDepositPaid(!!profile.security_deposit_paid)
             setWalletBalance(profile.wallet_balance || 0)
-            setStripeConnected(!!profile.stripe_connect_id)
             setRazorpayConnected(!!profile.razorpay_account_id)
         }
     }, [profile])
@@ -64,7 +61,7 @@ export function SetupBilling() {
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Failed to initiate payment")
 
-            // If backend returned a Stripe Checkout URL (international), redirect there
+            // If backend returned a Lemon Squeezy checkout URL (international), redirect there
             if (data.checkoutUrl) {
                 window.location.href = data.checkoutUrl
                 return
@@ -122,20 +119,6 @@ export function SetupBilling() {
         }
     }
 
-    const handleConnectStripe = async () => {
-        setIsConnectingStripe(true)
-        if (!user) {
-            setIsConnectingStripe(false)
-            return toast.error("User not found")
-        }
-        try {
-            window.location.href = `/api/founders/connect/stripe?founder_id=${user.id}`
-        } catch (err: any) {
-            toast.error("Failed to connect stripe")
-            setIsConnectingStripe(false)
-        }
-    }
-
     const handleConnectRazorpay = async () => {
         setIsConnectingRazorpay(true)
         toast.info("Razorpay Route integration coming soon!")
@@ -154,7 +137,7 @@ export function SetupBilling() {
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Failed to initiate deposit")
 
-            // If backend returned a Stripe Checkout URL (international), redirect there
+            // If backend returned a Lemon Squeezy checkout URL (international), redirect there
             if (data.checkoutUrl) {
                 window.location.href = data.checkoutUrl
                 return
@@ -309,19 +292,6 @@ export function SetupBilling() {
 
                     <div className="space-y-3">
                         <Button 
-                            onClick={handleConnectStripe} 
-                            disabled={isConnectingStripe || stripeConnected}
-                            variant="outline" 
-                            className="w-full justify-between"
-                        >
-                            <span className="flex items-center gap-2">
-                                <span className="font-semibold text-[#635BFF]">stripe</span>
-                                {stripeConnected ? "Connected" : "Connect Stripe"}
-                            </span>
-                            {stripeConnected ? <Check className="w-4 h-4 text-green-400" /> : <ExternalLink className="w-4 h-4 opacity-50" />}
-                        </Button>
-
-                        <Button 
                             onClick={handleConnectRazorpay} 
                             disabled={isConnectingRazorpay || razorpayConnected}
                             variant="outline" 
@@ -329,6 +299,7 @@ export function SetupBilling() {
                         >
                             <span className="flex items-center gap-2">
                                 <span className="font-semibold text-[#02042B]">Razorpay</span> Route
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20 font-medium">India Only</span>
                             </span>
                             {razorpayConnected ? <Check className="w-4 h-4 text-green-400" /> : <ExternalLink className="w-4 h-4 opacity-50" />}
                         </Button>

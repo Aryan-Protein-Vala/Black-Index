@@ -648,6 +648,7 @@ function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; 
                                                             <Copy className="w-4 h-4" />
                                                         )}
                                                     </button>
+                                                </div>
                                                 <p className="text-xs text-muted-foreground mt-2">💡 {provider.hint}</p>
                                             </div>
                                         )
@@ -714,41 +715,39 @@ function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; 
                                 </div>
 
                                 {/* Test Webhook Section */}
-                                <div className="mt-6 pt-4 border-t border-border/30">
-                                    <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-4">Final Check: Live Test</h4>
-                                    <Button
-                                        onClick={() => handleTestWebhook(webhookProduct.id)}
-                                        disabled={testingWebhook}
-                                        className="w-full text-xs font-light"
-                                        variant="outline"
-                                    >
-                                        {testingWebhook ? (
-                                            <><Loader2 className="w-3 h-3 mr-2 animate-spin" />Testing...</>
-                                        ) : (
-                                            'Test Webhook Integration'
-                                        )}
-                                    </Button>
-                                    {webhookTestResult && (
-                                        <div className={cn(
-                                            "mt-2 p-2 rounded-lg text-[10px] text-center",
-                                            webhookTestResult.success
-                                                ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                                                : "bg-red-500/10 text-red-400 border border-red-500/20"
-                                        )}>
-                                            {webhookTestResult.success ? '✅' : '❌'} {webhookTestResult.message}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="mt-6 pt-4 border-t border-border/30">
-                                    <Button
-                                        variant="outline"
-                                        className="w-full"
-                                        onClick={() => setWebhookProduct(null)}
-                                    >
-                                        Close
-                                    </Button>
-                                </div>
+                                <><div className="mt-6 pt-4 border-t border-border/30">
+                                            <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-4">Final Check: Live Test</h4>
+                                            <Button
+                                                onClick={() => handleTestWebhook(webhookProduct.id)}
+                                                disabled={testingWebhook}
+                                                className="w-full text-xs font-light"
+                                                variant="outline"
+                                            >
+                                                {testingWebhook ? (
+                                                    <><Loader2 className="w-3 h-3 mr-2 animate-spin" />Testing...</>
+                                                ) : (
+                                                    'Test Webhook Integration'
+                                                )}
+                                            </Button>
+                                            {webhookTestResult && (
+                                                <div className={cn(
+                                                    "mt-2 p-2 rounded-lg text-[10px] text-center",
+                                                    webhookTestResult.success
+                                                        ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                                                        : "bg-red-500/10 text-red-400 border border-red-500/20"
+                                                )}>
+                                                    {webhookTestResult.success ? '✅' : '❌'} {webhookTestResult.message}
+                                                </div>
+                                            )}
+                                        </div><div className="mt-6 pt-4 border-t border-border/30">
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full"
+                                                    onClick={() => setWebhookProduct(null)}
+                                                >
+                                                    Close
+                                                </Button>
+                                            </div></>
                             </SpotlightCard>
                         </motion.div>
                     </motion.div>

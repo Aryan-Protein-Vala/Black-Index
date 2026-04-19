@@ -572,10 +572,43 @@ function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; 
                                     <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
                                         <Webhook className="w-6 h-6 text-blue-500" />
                                     </div>
-                                    <h3 className="text-lg font-light mb-2">Webhook URLs</h3>
+                                    <h3 className="text-lg font-light mb-2">Webhook Configuration</h3>
                                     <p className="text-sm text-muted-foreground">
-                                        Copy the URL for your payment provider and paste it in their webhook settings.
+                                        Use these details to connect your store and track affiliate sales.
                                     </p>
+                                </div>
+
+                                {/* Shared Secret Section */}
+                                <div className="mb-6 p-4 rounded-lg border border-yellow-500/20 bg-yellow-500/5">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-sm font-medium text-yellow-500">🔑 Platform Webhook Secret</h4>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        Paste this into the <b>Secret</b> field in your provider dashboard (Razorpay, Stripe, etc).
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={(webhookProduct as any).webhook_secret || 'NO_SECRET_SET'}
+                                            className="flex-1 px-3 py-2 text-xs bg-black/30 border border-yellow-500/20 rounded-lg font-mono text-yellow-500/90"
+                                        />
+                                        <button
+                                            onClick={() => handleCopyUrl((webhookProduct as any).webhook_secret || '', 'webhooksecret')}
+                                            className={cn(
+                                                "px-3 py-2 rounded-lg border transition-all text-xs",
+                                                copiedUrl === 'webhooksecret'
+                                                    ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-500"
+                                                    : "border-yellow-500/30 bg-yellow-500/5 hover:bg-yellow-500/10 text-yellow-500/70"
+                                            )}
+                                        >
+                                            {copiedUrl === 'webhooksecret' ? (
+                                                <CheckCircle2 className="w-4 h-4" />
+                                            ) : (
+                                                <Copy className="w-4 h-4" />
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-4">
@@ -586,7 +619,7 @@ function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; 
                                         { name: 'Lemon Squeezy', key: 'lemonsqueezy', event: 'order_created', hint: 'Add ref_id in custom_data' },
                                         { name: 'PayPal', key: 'paypal', event: 'PAYMENT.CAPTURE.COMPLETED', hint: 'Add ref_id in custom_id' },
                                     ].map((provider) => {
-                                        const url = `${process.env.NEXT_PUBLIC_APP_URL || 'https://blackindex.in'}/api/webhooks/${provider.key}/${webhookProduct.id}?secret=${(webhookProduct as any).webhook_secret || 'YOUR_SECRET'}`
+                                        const url = `${process.env.NEXT_PUBLIC_APP_URL || 'https://blackindex.in'}/api/webhooks/${provider.key}/${webhookProduct.id}`
                                         return (
                                             <div key={provider.key} className="p-3 rounded-lg border border-border/30 bg-foreground/5">
                                                 <div className="flex items-center justify-between mb-2">
@@ -860,7 +893,7 @@ export default function FounderDashboard() {
         // SECURITY: Only select non-sensitive fields - webhook_secret must NEVER be returned to client
         const { data: productsData } = await supabase
             .from("products")
-            .select("id, name, description, logo_url, website_url, is_active, is_founders_choice, is_featured, featured_until, commission_config, max_cac_limit, created_at, settlement_mode, founder_id")
+            .select("id, name, description, logo_url, website_url, is_active, is_founders_choice, is_featured, featured_until, commission_config, max_cac_limit, created_at, settlement_mode, founder_id, webhook_secret")
             .eq("founder_id", user.id)
             .order("created_at", { ascending: false })
 

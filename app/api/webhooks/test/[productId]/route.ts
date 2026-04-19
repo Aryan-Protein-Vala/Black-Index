@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase-server'
+import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server'
 
 /**
  * Test Webhook Endpoint
@@ -13,10 +13,11 @@ export async function POST(
     { params }: { params: Promise<{ productId: string }> }
 ) {
     const { productId } = await params
-    const supabase = createAdminClient()
+    const supabase = await createServerSupabaseClient()
+    const adminSupabase = createAdminClient()
 
     try {
-        // Get current user
+        // Get current user using the session client
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -74,7 +75,7 @@ export async function POST(
         }
 
         // Log the test
-        await supabase.from('webhook_logs').insert({
+        await adminSupabase.from('webhook_logs').insert({
             product_id: productId,
             event_type: 'test_webhook',
             payload: testPayload,
@@ -92,7 +93,7 @@ export async function POST(
 
         // If all checks pass, mark product webhook as verified
         if (allPassed) {
-            await supabase
+            await adminSupabase
                 .from('products')
                 .update({
                     webhook_status: 'verified',

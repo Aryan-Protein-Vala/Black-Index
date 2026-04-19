@@ -44,6 +44,14 @@ export function SetupBilling() {
         })
     }
 
+    const USD_TO_INR = 84
+
+    const handleConnectRazorpay = async () => {
+        setIsConnectingRazorpay(true)
+        toast.info("Razorpay Route integration coming soon!")
+        setTimeout(() => setIsConnectingRazorpay(false), 1500)
+    }
+
     const handleDepositWallet = async () => {
         if (!user) return
         setIsDepositingWallet(true)
@@ -149,8 +157,13 @@ export function SetupBilling() {
                             </p>
                         </div>
                     </div>
-                    <Button variant="outline" className="w-full" disabled={region === 'international' || razorpayConnected}>
-                        {razorpayConnected ? "Razorpay Connected" : "Connect Razorpay Route"}
+                    <Button 
+                        variant="outline" 
+                        className="w-full" 
+                        onClick={handleConnectRazorpay}
+                        disabled={region === 'international' || razorpayConnected || isConnectingRazorpay}
+                    >
+                        {isConnectingRazorpay ? "Connecting..." : razorpayConnected ? "Razorpay Connected" : "Connect Razorpay Route"}
                     </Button>
                 </SpotlightCard>
 
@@ -168,7 +181,9 @@ export function SetupBilling() {
                     <div className="bg-foreground/5 rounded-lg p-4 mb-4">
                         <p className="text-xs text-muted-foreground uppercase">Wallet Balance</p>
                         <p className="text-2xl font-light">
-                            {region === 'india' ? `₹${(walletBalance / 100).toLocaleString('en-IN')}` : `$${(walletBalance / 100).toFixed(2)}`}
+                            {region === 'india' 
+                                ? `₹${(walletBalance / 100).toLocaleString('en-IN')}` 
+                                : `$${(walletBalance / (100 * USD_TO_INR)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                         </p>
                     </div>
                     <Button onClick={handleDepositWallet} disabled={isDepositingWallet} className="w-full">

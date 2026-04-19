@@ -70,7 +70,7 @@ export default function IntegrationDocsPage() {
                                     This script automatically captures the <code className="text-purple-400 font-mono">ref_id</code> from the URL, persists it in a first-party cookie, and handles attribution logic.
                                 </p>
                                 
-                                <SpotlightCard className="p-8 group">
+                                <SpotlightCard className="p-4 md:p-8 group overflow-hidden">
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="flex items-center gap-2">
                                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -83,8 +83,8 @@ export default function IntegrationDocsPage() {
                                             {copied === 'script' ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                                         </button>
                                     </div>
-                                    <div className="p-6 rounded-xl bg-black/60 border border-white/5 overflow-x-auto shadow-2xl">
-                                        <code className="text-sm text-emerald-400 font-mono">
+                                    <div className="p-4 md:p-6 rounded-xl bg-black/60 border border-white/5 overflow-x-auto shadow-2xl">
+                                        <code className="text-xs md:text-sm text-emerald-400 font-mono break-all md:break-normal">
                                             {`<script src="https://blackindex.in/track.js"></script>`}
                                         </code>
                                     </div>
@@ -125,7 +125,7 @@ export default function IntegrationDocsPage() {
                                     This allows Black Index to lock the Warlord to the customer identity for long-term attribution.
                                 </p>
                                 
-                                <SpotlightCard className="p-8">
+                                <SpotlightCard className="p-4 md:p-8 overflow-hidden">
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="flex items-center gap-2">
                                             <Terminal className="w-4 h-4 text-muted-foreground" />
@@ -138,8 +138,8 @@ export default function IntegrationDocsPage() {
                                             {copied === 'backend' ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                                         </button>
                                     </div>
-                                    <div className="p-6 rounded-xl bg-black/60 border border-white/5 overflow-x-auto shadow-2xl">
-                                        <code className="text-sm text-blue-400 font-mono leading-relaxed">
+                                    <div className="p-4 md:p-6 rounded-xl bg-black/60 border border-white/5 overflow-x-auto shadow-2xl">
+                                        <code className="text-xs md:text-sm text-blue-400 font-mono leading-relaxed whitespace-pre md:whitespace-pre-wrap break-words">
 {`const referralId = req.cookies.ref_id // Read from cookie
 
 const session = await stripe.checkout.sessions.create({
@@ -208,7 +208,7 @@ const session = await stripe.checkout.sessions.create({
                                     </div>
                                 </div>
                                 
-                                <div className="p-8 rounded-3xl border border-white/5 bg-black/20">
+                                <div className="p-4 md:p-8 rounded-3xl border border-white/5 bg-black/20 overflow-hidden">
                                     <h4 className="text-[10px] font-mono uppercase tracking-[0.3em] text-muted-foreground mb-6">Required Webhook Events</h4>
                                     <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {[
@@ -218,8 +218,8 @@ const session = await stripe.checkout.sessions.create({
                                             { name: 'order.paid', provider: 'Razorpay' },
                                             { name: 'order_created', provider: 'Lemon Squeezy' }
                                         ].map(event => (
-                                            <li key={event.name} className="flex flex-col gap-1 group">
-                                                <span className="text-emerald-400 font-mono text-xs">{event.name}</span>
+                                            <li key={event.name} className="flex flex-col gap-1 group overflow-hidden">
+                                                <span className="text-emerald-400 font-mono text-[10px] md:text-xs break-all">{event.name}</span>
                                                 <span className="text-[10px] text-muted-foreground font-light uppercase tracking-widest">{event.provider}</span>
                                             </li>
                                         ))}
@@ -231,17 +231,17 @@ const session = await stripe.checkout.sessions.create({
 
                     <FadeInSection>
                         <div className="mt-40 pt-20 border-t border-white/10 text-center space-y-12">
-                            <div className="space-y-4">
-                                <h3 className="text-3xl font-light tracking-tight">System Ready.</h3>
-                                <p className="text-muted-foreground font-light">Your integration is now connected to the global sales surface.</p>
+                            <div className="space-y-4 px-4">
+                                <h3 className="text-2xl md:text-3xl font-light tracking-tight">System Ready.</h3>
+                                <p className="text-sm md:text-base text-muted-foreground font-light max-w-lg mx-auto">Your integration is now connected to the global sales surface.</p>
                             </div>
-                            <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                                <Link href="/dashboard/founder">
-                                    <Button className="h-14 px-10 bg-foreground text-background hover:bg-foreground/90 font-normal transition-all hover:scale-105">
+                            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 px-6">
+                                <Link href="/dashboard/founder" className="w-full sm:w-auto">
+                                    <Button className="w-full h-14 px-10 bg-foreground text-background hover:bg-foreground/90 font-normal transition-all hover:scale-105">
                                         Go to Dashboard
                                     </Button>
                                 </Link>
-                                <Button variant="ghost" className="h-14 px-10 font-light border border-white/5 hover:bg-white/5 transition-all">
+                                <Button variant="ghost" className="w-full sm:w-auto h-14 px-10 font-light border border-white/5 hover:bg-white/5 transition-all text-xs md:text-sm">
                                     Speak to an Engineer
                                 </Button>
                             </div>

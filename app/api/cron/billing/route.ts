@@ -99,16 +99,47 @@ export async function GET(request: NextRequest) {
                     .eq('id', charge.id)
 
                 try {
-                    // Get founder details for invoice
+                    // Get founder details for settlement
                     const { data: founder } = await supabase
                         .from('profiles')
-                        .select('email, full_name, razorpay_customer_id')
+                        .select('email, full_name, razorpay_customer_id, wallet_balance')
                         .eq('id', charge.founder_id)
                         .single()
 
-                    const founderData = founder as { email: string; full_name: string; razorpay_customer_id: string | null } | null
+                    const founderData = founder as { email: string; full_name: string; razorpay_customer_id: string | null; wallet_balance: number } | null
 
-                    // Create Razorpay Invoice (auto-charge if mandate exists)
+                    // SETTLEMENT LOGIC
+                    // Fallback to Wallet Deduction if Razorpay Customer ID is missing
+                    if (!founderData?.razorpay_customer_id) {
+                        const currentBalance = founderData?.wallet_balance || 0
+                        
+                        if (currentBalance >= charge.amount) {
+                            // Sufficient funds in wallet - Direct Deduction
+                            await supabase
+                                .from('profiles')
+                                .update({
+                                    wallet_balance: currentBalance - charge.amount,
+                                    unbilled_amount: 0,
+                                    last_charge_date: new Date().toISOString()
+                                } as never)
+                                .eq('id', charge.founder_id)
+
+                            await supabase
+                                .from('charge_schedules')
+                                .update({
+                                    status: 'paid',
+                                    payment_method: 'wallet'
+                                } as never)
+                                .eq('id', charge.id)
+
+                            results.executed++
+                            continue // Move to next charge
+                        } else {
+                            throw new Error('Insufficient wallet balance for settlement')
+                        }
+                    }
+
+                    // Otherwise, Proceed with Razorpay Invoice (Auto-charge if mandate exists)
                     const invoiceResponse = await fetch('https://api.razorpay.com/v1/invoices', {
                         method: 'POST',
                         headers: {
@@ -118,11 +149,8 @@ export async function GET(request: NextRequest) {
                         body: JSON.stringify({
                             type: 'invoice',
                             description: 'Black Index - Commission Settlement',
-                            customer: founderData?.razorpay_customer_id ? {
+                            customer: {
                                 id: founderData.razorpay_customer_id
-                            } : {
-                                email: founderData?.email,
-                                name: founderData?.full_name || 'Founder',
                             },
                             line_items: [{
                                 name: 'Commission Settlement',
@@ -134,7 +162,7 @@ export async function GET(request: NextRequest) {
                             sms_notify: 1,
                             email_notify: 1,
                             currency: 'INR',
-                            expire_by: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // Expires in 7 days
+                            expire_by: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60),
                         }),
                     })
 
@@ -151,6 +179,7 @@ export async function GET(request: NextRequest) {
                         .update({
                             status: 'paid', // Invoice sent, considered "charged"
                             razorpay_invoice_id: invoice.id,
+                            payment_method: 'razorpay_invoice'
                         } as never)
                         .eq('id', charge.id)
 

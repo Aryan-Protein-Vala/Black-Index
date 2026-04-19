@@ -642,39 +642,42 @@ function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; 
                                 </div>
 
                                 {/* Link to Documentation */}
-                                <div className="space-y-4">
-                                    <Link href="/docs/integration" target="_blank" className="block">
-                                        <Button className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-normal text-sm tracking-tight group">
-                                            Read the Integration Docs
-                                            <ArrowUpRight className="ml-2 w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                                <div className="mt-6 pt-4 border-t border-border/30 text-center">
+                                    <h4 className="text-sm font-medium mb-2">Need Help Integrating?</h4>
+                                    <p className="text-xs text-muted-foreground mb-4">
+                                        Read the official documentation to learn how to lock Stripe/Lemon Squeezy Customer IDs to Warlords for recurring payments.
+                                    </p>
+                                    <a href="/docs/integration" target="_blank" rel="noopener noreferrer">
+                                        <Button className="w-full bg-foreground text-background">
+                                            View Developer Docs →
                                         </Button>
-                                    </Link>
-                                    
-                                    <div className="pt-4 border-t border-border/10">
-                                        <p className="text-[10px] text-muted-foreground text-center uppercase tracking-[0.2em] mb-4">Final Check</p>
-                                        <Button
-                                            onClick={() => handleTestWebhook(webhookProduct.id)}
-                                            disabled={testingWebhook}
-                                            className="w-full text-xs font-light"
-                                            variant="outline"
-                                        >
-                                            {testingWebhook ? (
-                                                <><Loader2 className="w-3 h-3 mr-2 animate-spin" />Testing...</>
-                                            ) : (
-                                                'Test Webhook Integration'
-                                            )}
-                                        </Button>
-                                        {webhookTestResult && (
-                                            <div className={cn(
-                                                "mt-2 p-2 rounded-lg text-[10px] text-center",
-                                                webhookTestResult.success
-                                                    ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                                                    : "bg-red-500/10 text-red-400 border border-red-500/20"
-                                            )}>
-                                                {webhookTestResult.success ? '✅' : '❌'} {webhookTestResult.message}
-                                            </div>
+                                    </a>
+                                </div>
+
+                                <div className="mt-6 pt-4 border-t border-border/30">
+                                    <p className="text-[10px] text-muted-foreground text-center uppercase tracking-[0.2em] mb-4">Verification</p>
+                                    <Button
+                                        onClick={() => handleTestWebhook(webhookProduct.id)}
+                                        disabled={testingWebhook}
+                                        className="w-full text-xs font-light"
+                                        variant="outline"
+                                    >
+                                        {testingWebhook ? (
+                                            <><Loader2 className="w-3 h-3 mr-2 animate-spin" />Testing...</>
+                                        ) : (
+                                            'Test Integration'
                                         )}
-                                    </div>
+                                    </Button>
+                                    {webhookTestResult && (
+                                        <div className={cn(
+                                            "mt-2 p-2 rounded-lg text-[10px] text-center",
+                                            webhookTestResult.success
+                                                ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                                                : "bg-red-500/10 text-red-400 border border-red-500/20"
+                                        )}>
+                                            {webhookTestResult.success ? '✅' : '❌'} {webhookTestResult.message}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="mt-8">

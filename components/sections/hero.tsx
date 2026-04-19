@@ -8,7 +8,7 @@ import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 
 const titleWords = ["Black", "Index"]
-const subtitleWords = ["The", "Sales", "Network."]
+const subtitleWords = ["The", "Performance", "Layer", "for", "SaaS."]
 
 export function HeroSection() {
   const ref = useRef<HTMLElement>(null)

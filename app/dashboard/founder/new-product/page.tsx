@@ -57,17 +57,9 @@ export default function NewProductPage() {
         { id: "devtools", label: "DevTools" },
         { id: "marketing", label: "Marketing" },
         { id: "creator_tools", label: "Creator Tools" },
-        { id: "other", label: "Other" }
     ]
 
-    const generateWebhookSecret = () => {
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-        let result = "whsec_"
-        for (let i = 0; i < 32; i++) {
-            result += chars.charAt(Math.floor(Math.random() * chars.length))
-        }
-        return result
-    }
+    const [providedWebhookSecret, setProvidedWebhookSecret] = useState("")
 
     const handleCopy = async (text: string, type: "secret" | "url") => {
         await navigator.clipboard.writeText(text)
@@ -99,8 +91,7 @@ export default function NewProductPage() {
 
         try {
             const supabase = createClient()
-            const secret = generateWebhookSecret()
-            setWebhookSecret(secret)
+            setWebhookSecret(providedWebhookSecret)
 
             const commissionConfig = {
                 type: "hybrid" as const,
@@ -125,7 +116,7 @@ export default function NewProductPage() {
                 description: extendedDesc || null,
                 commission_config: commissionConfig,
                 max_cac_limit: maxCacLimit ? parseInt(maxCacLimit) * 100 : null,
-                webhook_secret: secret,
+                webhook_secret: providedWebhookSecret,
                 settlement_mode: "webhook",
                 is_active: true,
             } as any).select("id").single()
@@ -290,6 +281,19 @@ export default function NewProductPage() {
                         </div>
 
                         <div className="space-y-2">
+                            <Label htmlFor="webhook_secret">Webhook Signing Secret *</Label>
+                            <Input
+                                id="webhook_secret"
+                                type="password"
+                                value={providedWebhookSecret}
+                                onChange={(e) => setProvidedWebhookSecret(e.target.value)}
+                                placeholder="Paste your Stripe/Razorpay webhook secret here"
+                                className="h-12 bg-input/30"
+                            />
+                            <p className="text-xs text-muted-foreground">Used to verify that payloads come from your server</p>
+                        </div>
+
+                        <div className="space-y-2">
                             <Label htmlFor="audience">Target Audience</Label>
                             <Input
                                 id="audience"
@@ -361,7 +365,7 @@ export default function NewProductPage() {
 
                     <div className="mt-8 flex justify-end">
                         <Button
-                            disabled={!name || !websiteUrl || isSubmitting}
+                            disabled={!name || !websiteUrl || !providedWebhookSecret || isSubmitting}
                             onClick={handleSubmit}
                             className="bg-foreground text-background hover:bg-foreground/90"
                         >
@@ -452,7 +456,7 @@ export default function NewProductPage() {
                         <SpotlightCard className="p-5">
                             <h3 className="font-medium mb-2">Webhook Secret</h3>
                             <p className="text-sm text-muted-foreground mb-3">
-                                Use this secret in your {selectedProvider === "razorpay" ? "Razorpay" : "webhook"} settings. Keep it safe!
+                                You configured this secret during product creation. Use it in your provider dashboard.
                             </p>
                             <div className="flex items-center gap-2 p-3 bg-muted/20 rounded-lg">
                                 <code className="flex-1 text-xs font-mono break-all">{webhookSecret}</code>

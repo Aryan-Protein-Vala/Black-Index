@@ -648,20 +648,19 @@ function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; 
                                                             <Copy className="w-4 h-4" />
                                                         )}
                                                     </button>
-                                                </div>
                                                 <p className="text-xs text-muted-foreground mt-2">💡 {provider.hint}</p>
                                             </div>
                                         )
                                     })}
                                 </div>
 
-                                {/* Tracking Script Section */}
+                                {/* Step 1: The Script */}
                                 <div className="mt-6 pt-4 border-t border-border/30">
-                                    <h4 className="text-sm font-medium mb-2">📦 Step 1: Add Tracking Script</h4>
+                                    <h4 className="text-sm font-medium mb-2">📦 Step 1: The Script</h4>
                                     <p className="text-xs text-muted-foreground mb-3">
-                                        Add this to your website to auto-capture ref_id and inject into payments:
+                                        Add this to your website (landing page and checkout page) to auto-capture referral IDs:
                                     </p>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 mb-2">
                                         <input
                                             type="text"
                                             readOnly
@@ -684,30 +683,54 @@ function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; 
                                             )}
                                         </button>
                                     </div>
-                                    <p className="text-xs text-green-400 mt-2">
-                                        ✓ Auto-captures ref_id from URL<br />
-                                        ✓ Auto-injects into Stripe & Razorpay
+                                    <p className="text-[10px] text-green-400">
+                                        ✓ Captures ref_id from URL & Cookies automatically.
                                     </p>
+                                </div>
+
+                                {/* Step 2: The Backend */}
+                                <div className="mt-6 pt-4 border-t border-border/30">
+                                    <h4 className="text-sm font-medium mb-2">🛠️ Step 2: The Backend (CRITICAL)</h4>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        Pass the referral ID to your payment provider's metadata for recurring tracking.
+                                    </p>
+                                    
+                                    <div className="p-3 bg-black/50 border border-border/20 rounded-lg font-mono text-[11px] mb-3 text-emerald-400">
+                                        <p className="mb-1 text-muted-foreground font-sans text-[10px] uppercase tracking-wider">Node.js / Stripe Example</p>
+                                        <div className="overflow-x-auto">
+                                            <pre>{`subscription_data: { 
+  metadata: { 
+    ref_id: req.cookies.ref_id // Or window.BlackIndex.getRefId()
+  } 
+}`}</pre>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="p-3 rounded-lg border border-red-500/10 bg-red-500/5">
+                                        <p className="text-[11px] text-red-400 font-light italic">
+                                            ⚠️ WITHOUT this metadata, recurring commissions cannot be locked to the customer identity for lifetime tracking.
+                                        </p>
+                                    </div>
                                 </div>
 
                                 {/* Test Webhook Section */}
                                 <div className="mt-6 pt-4 border-t border-border/30">
-                                    <h4 className="text-sm font-medium mb-2">🧪 Step 2: Test Your Integration</h4>
+                                    <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-4">Final Check: Live Test</h4>
                                     <Button
                                         onClick={() => handleTestWebhook(webhookProduct.id)}
                                         disabled={testingWebhook}
-                                        className="w-full"
+                                        className="w-full text-xs font-light"
                                         variant="outline"
                                     >
                                         {testingWebhook ? (
-                                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Testing...</>
+                                            <><Loader2 className="w-3 h-3 mr-2 animate-spin" />Testing...</>
                                         ) : (
-                                            '🔍 Test Webhook Setup'
+                                            'Test Webhook Integration'
                                         )}
                                     </Button>
                                     {webhookTestResult && (
                                         <div className={cn(
-                                            "mt-2 p-2 rounded-lg text-xs text-center",
+                                            "mt-2 p-2 rounded-lg text-[10px] text-center",
                                             webhookTestResult.success
                                                 ? "bg-green-500/10 text-green-400 border border-green-500/20"
                                                 : "bg-red-500/10 text-red-400 border border-red-500/20"

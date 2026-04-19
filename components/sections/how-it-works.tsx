@@ -1,25 +1,25 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { MousePointer2, Globe, Zap } from "lucide-react"
+import { Split, Shield, Lock } from "lucide-react"
 import { SpotlightCard } from "@/components/ui/spotlight-card"
 import { FadeInSection } from "@/components/ui/fade-in-section"
 
 const steps = [
   {
-    title: "Choose an Offer",
-    caption: "Browse curated products",
-    icon: MousePointer2,
+    title: "Automated Splits",
+    caption: "Founders never have to manually pay affiliates. Stripe and Razorpay handle the 70/30 split at checkout.",
+    icon: Split,
   },
   {
-    title: "Sell Anywhere",
-    caption: "Your network, your way",
-    icon: Globe,
+    title: "Recurring Identity Lock",
+    caption: "Commissions aren't based on cookies. We lock the Warlord to the Stripe Customer ID for lifetime tracking.",
+    icon: Shield,
   },
   {
-    title: "Earn Automatically",
-    caption: "Instant commission payouts",
-    icon: Zap,
+    title: "The Vault",
+    caption: "High-tier Warlords get exclusive access to promote the world's fastest-growing SaaS products.",
+    icon: Lock,
   },
 ]
 

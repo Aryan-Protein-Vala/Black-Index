@@ -322,7 +322,11 @@ export function SetupBilling() {
 
                     <div className="bg-foreground/5 rounded-lg p-4 mb-4 border border-border/30">
                         <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Wallet Balance</p>
-                        <p className="text-2xl font-light">{region === 'india' ? '₹' : '$'}{(walletBalance / 100).toLocaleString(region === 'india' ? 'en-IN' : 'en-US')}</p>
+                        <p className="text-2xl font-light">
+                            {region === 'india' 
+                                ? `₹${(walletBalance / 100).toLocaleString('en-IN')}` 
+                                : `$${(walletBalance / 100 / 84).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        </p>
                     </div>
 
                     <Button 

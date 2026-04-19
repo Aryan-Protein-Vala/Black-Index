@@ -578,176 +578,114 @@ function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; 
                                     </p>
                                 </div>
 
-                                {/* Shared Secret Section */}
-                                <div className="mb-6 p-4 rounded-lg border border-yellow-500/20 bg-yellow-500/5">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-sm font-medium text-yellow-500">🔑 Platform Webhook Secret</h4>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mb-3">
-                                        Paste this into the <b>Secret</b> field in your provider dashboard (Razorpay, Stripe, etc).
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            readOnly
-                                            value={(webhookProduct as any).webhook_secret || 'NO_SECRET_SET'}
-                                            className="flex-1 px-3 py-2 text-xs bg-black/30 border border-yellow-500/20 rounded-lg font-mono text-yellow-500/90"
-                                        />
-                                        <button
-                                            onClick={() => handleCopyUrl((webhookProduct as any).webhook_secret || '', 'webhooksecret')}
-                                            className={cn(
-                                                "px-3 py-2 rounded-lg border transition-all text-xs",
-                                                copiedUrl === 'webhooksecret'
-                                                    ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-500"
-                                                    : "border-yellow-500/30 bg-yellow-500/5 hover:bg-yellow-500/10 text-yellow-500/70"
-                                            )}
-                                        >
-                                            {copiedUrl === 'webhooksecret' ? (
-                                                <CheckCircle2 className="w-4 h-4" />
-                                            ) : (
-                                                <Copy className="w-4 h-4" />
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-4">
-                                    {[
-                                        { name: 'Razorpay', key: 'razorpay', event: 'payment.captured', hint: 'Add ref_id in order notes' },
-                                        { name: 'Stripe', key: 'stripe', event: 'checkout.session.completed', hint: 'Add ref_id in session metadata' },
-                                        { name: 'Gumroad', key: 'gumroad', event: 'Ping URL', hint: 'Add ?ref_id=xxx to product links' },
-                                        { name: 'Lemon Squeezy', key: 'lemonsqueezy', event: 'order_created', hint: 'Add ref_id in custom_data' },
-                                        { name: 'PayPal', key: 'paypal', event: 'PAYMENT.CAPTURE.COMPLETED', hint: 'Add ref_id in custom_id' },
-                                    ].map((provider) => {
-                                        const url = `${process.env.NEXT_PUBLIC_APP_URL || 'https://blackindex.in'}/api/webhooks/${provider.key}/${webhookProduct.id}`
-                                        return (
-                                            <div key={provider.key} className="p-3 rounded-lg border border-border/30 bg-foreground/5">
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <span className="font-medium text-sm">{provider.name}</span>
-                                                    <span className="text-xs text-muted-foreground">{provider.event}</span>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        readOnly
-                                                        value={url}
-                                                        className="flex-1 px-3 py-2 text-xs bg-black/30 border border-border/20 rounded-lg font-mono truncate"
-                                                    />
-                                                    <button
-                                                        onClick={() => handleCopyUrl(url, provider.key)}
-                                                        className={cn(
-                                                            "px-3 py-2 rounded-lg border transition-all text-xs",
-                                                            copiedUrl === provider.key
-                                                                ? "border-green-500/50 bg-green-500/10 text-green-400"
-                                                                : "border-border/30 bg-foreground/5 hover:bg-foreground/10 text-muted-foreground"
-                                                        )}
-                                                    >
-                                                        {copiedUrl === provider.key ? (
-                                                            <CheckCircle2 className="w-4 h-4" />
-                                                        ) : (
-                                                            <Copy className="w-4 h-4" />
-                                                        )}
-                                                    </button>
-                                                </div>
-                                                <p className="text-xs text-muted-foreground mt-2">💡 {provider.hint}</p>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-
-                                {/* Step 1: The Script */}
-                                <div className="mt-6 pt-4 border-t border-border/30">
-                                    <h4 className="text-sm font-medium mb-2">📦 Step 1: The Script</h4>
-                                    <p className="text-xs text-muted-foreground mb-3">
-                                        Add this to your website (landing page and checkout page) to auto-capture referral IDs:
-                                    </p>
-                                    <div className="flex gap-2 mb-2">
-                                        <input
-                                            type="text"
-                                            readOnly
-                                            value={`<script src="https://blackindex.in/track.js"></script>`}
-                                            className="flex-1 px-3 py-2 text-xs bg-black/30 border border-border/20 rounded-lg font-mono"
-                                        />
-                                        <button
-                                            onClick={() => handleCopyUrl(`<script src="https://blackindex.in/track.js"></script>`, 'trackjs')}
-                                            className={cn(
-                                                "px-3 py-2 rounded-lg border transition-all text-xs",
-                                                copiedUrl === 'trackjs'
-                                                    ? "border-green-500/50 bg-green-500/10 text-green-400"
-                                                    : "border-border/30 bg-foreground/5 hover:bg-foreground/10 text-muted-foreground"
-                                            )}
-                                        >
-                                            {copiedUrl === 'trackjs' ? (
-                                                <CheckCircle2 className="w-4 h-4" />
-                                            ) : (
-                                                <Copy className="w-4 h-4" />
-                                            )}
-                                        </button>
-                                    </div>
-                                    <p className="text-[10px] text-green-400">
-                                        ✓ Captures ref_id from URL & Cookies automatically.
-                                    </p>
-                                </div>
-
-                                {/* Step 2: The Backend */}
-                                <div className="mt-6 pt-4 border-t border-border/30">
-                                    <h4 className="text-sm font-medium mb-2">🛠️ Step 2: The Backend (CRITICAL)</h4>
-                                    <p className="text-xs text-muted-foreground mb-3">
-                                        Pass the referral ID to your payment provider's metadata for recurring tracking.
-                                    </p>
-                                    
-                                    <div className="p-3 bg-black/50 border border-border/20 rounded-lg font-mono text-[11px] mb-3 text-emerald-400">
-                                        <p className="mb-1 text-muted-foreground font-sans text-[10px] uppercase tracking-wider">Node.js / Stripe Example</p>
-                                        <div className="overflow-x-auto">
-                                            <pre>{`subscription_data: { 
-  metadata: { 
-    ref_id: req.cookies.ref_id // Or window.BlackIndex.getRefId()
-  } 
-}`}</pre>
+                                 {/* ID & Secrets Section */}
+                                <div className="space-y-4 mb-8">
+                                    {/* Product ID */}
+                                    <div className="p-4 rounded-lg border border-border/30 bg-foreground/5">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-xs font-medium text-muted-foreground uppercase opacity-60">Product ID</h4>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                readOnly
+                                                value={webhookProduct.id}
+                                                className="flex-1 px-3 py-2 text-xs bg-black/30 border border-border/20 rounded-lg font-mono"
+                                            />
+                                            <button
+                                                onClick={() => handleCopyUrl(webhookProduct.id, 'productid')}
+                                                className={cn(
+                                                    "px-3 py-2 rounded-lg border transition-all text-xs",
+                                                    copiedUrl === 'productid'
+                                                        ? "border-green-500/50 bg-green-500/10 text-green-400"
+                                                        : "border-border/30 bg-foreground/5 hover:bg-foreground/10 text-muted-foreground"
+                                                )}
+                                            >
+                                                {copiedUrl === 'productid' ? (
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                ) : (
+                                                    <Copy className="w-4 h-4" />
+                                                )}
+                                            </button>
                                         </div>
                                     </div>
-                                    
-                                    <div className="p-3 rounded-lg border border-red-500/10 bg-red-500/5">
-                                        <p className="text-[11px] text-red-400 font-light italic">
-                                            ⚠️ WITHOUT this metadata, recurring commissions cannot be locked to the customer identity for lifetime tracking.
-                                        </p>
+
+                                    {/* Webhook Secret */}
+                                    <div className="p-4 rounded-lg border border-yellow-500/20 bg-yellow-500/5">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-xs font-medium text-yellow-500 uppercase opacity-80">Webhook Signing Secret</h4>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                readOnly
+                                                value={(webhookProduct as any).webhook_secret || 'NO_SECRET_SET'}
+                                                className="flex-1 px-3 py-2 text-xs bg-black/30 border border-yellow-500/20 rounded-lg font-mono text-yellow-500/90"
+                                            />
+                                            <button
+                                                onClick={() => handleCopyUrl((webhookProduct as any).webhook_secret || '', 'webhooksecret')}
+                                                className={cn(
+                                                    "px-3 py-2 rounded-lg border transition-all text-xs",
+                                                    copiedUrl === 'webhooksecret'
+                                                        ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-500"
+                                                        : "border-yellow-500/30 bg-yellow-500/5 hover:bg-yellow-500/10 text-yellow-500/70"
+                                                )}
+                                            >
+                                                {copiedUrl === 'webhooksecret' ? (
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                ) : (
+                                                    <Copy className="w-4 h-4" />
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Test Webhook Section */}
-                                <><div className="mt-6 pt-4 border-t border-border/30">
-                                            <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-4">Final Check: Live Test</h4>
-                                            <Button
-                                                onClick={() => handleTestWebhook(webhookProduct.id)}
-                                                disabled={testingWebhook}
-                                                className="w-full text-xs font-light"
-                                                variant="outline"
-                                            >
-                                                {testingWebhook ? (
-                                                    <><Loader2 className="w-3 h-3 mr-2 animate-spin" />Testing...</>
-                                                ) : (
-                                                    'Test Webhook Integration'
-                                                )}
-                                            </Button>
-                                            {webhookTestResult && (
-                                                <div className={cn(
-                                                    "mt-2 p-2 rounded-lg text-[10px] text-center",
-                                                    webhookTestResult.success
-                                                        ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                                                        : "bg-red-500/10 text-red-400 border border-red-500/20"
-                                                )}>
-                                                    {webhookTestResult.success ? '✅' : '❌'} {webhookTestResult.message}
-                                                </div>
+                                {/* Link to Documentation */}
+                                <div className="space-y-4">
+                                    <Link href="/docs/integration" target="_blank" className="block">
+                                        <Button className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-normal text-sm tracking-tight group">
+                                            Read the Integration Docs
+                                            <ArrowUpRight className="ml-2 w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                                        </Button>
+                                    </Link>
+                                    
+                                    <div className="pt-4 border-t border-border/10">
+                                        <p className="text-[10px] text-muted-foreground text-center uppercase tracking-[0.2em] mb-4">Final Check</p>
+                                        <Button
+                                            onClick={() => handleTestWebhook(webhookProduct.id)}
+                                            disabled={testingWebhook}
+                                            className="w-full text-xs font-light"
+                                            variant="outline"
+                                        >
+                                            {testingWebhook ? (
+                                                <><Loader2 className="w-3 h-3 mr-2 animate-spin" />Testing...</>
+                                            ) : (
+                                                'Test Webhook Integration'
                                             )}
-                                        </div><div className="mt-6 pt-4 border-t border-border/30">
-                                                <Button
-                                                    variant="outline"
-                                                    className="w-full"
-                                                    onClick={() => setWebhookProduct(null)}
-                                                >
-                                                    Close
-                                                </Button>
-                                            </div></>
+                                        </Button>
+                                        {webhookTestResult && (
+                                            <div className={cn(
+                                                "mt-2 p-2 rounded-lg text-[10px] text-center",
+                                                webhookTestResult.success
+                                                    ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                                                    : "bg-red-500/10 text-red-400 border border-red-500/20"
+                                            )}>
+                                                {webhookTestResult.success ? '✅' : '❌'} {webhookTestResult.message}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="mt-8">
+                                    <Button
+                                        variant="ghost"
+                                        className="w-full text-xs opacity-50 hover:opacity-100"
+                                        onClick={() => setWebhookProduct(null)}
+                                    >
+                                        Dismiss
+                                    </Button>
+                                </div>
                             </SpotlightCard>
                         </motion.div>
                     </motion.div>

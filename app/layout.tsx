@@ -148,6 +148,7 @@ export default function RootLayout({
               }}
             />
             <Analytics />
+            <Script src="/track.js" strategy="afterInteractive" />
           </ConfirmProvider>
         </AuthProvider>
       </body>

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     const supabase = createAdminClient()
     const body = await request.json()
-    const { user_id, currency } = body
+    const { user_id, currency, ref_id } = body
 
     if (!user_id) {
         return NextResponse.json({ error: 'Missing user_id' }, { status: 400 })
@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
                                 custom: {
                                     user_id,
                                     type: 'security_deposit',
+                                    ref_id: ref_id || null,
                                 },
                             },
                         },
@@ -141,6 +142,7 @@ export async function POST(request: NextRequest) {
             notes: {
                 type: 'security_deposit',
                 founder_id: user_id,
+                ref_id: ref_id || null,
             }
         })
 

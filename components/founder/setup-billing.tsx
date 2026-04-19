@@ -53,10 +53,17 @@ export function SetupBilling() {
         if (!user) return
         setIsSubmittingDeposit(true)
         try {
+            // Capture ref_id from tracking script if available
+            const refId = (window as any).BlackIndex?.getRefId()
+
             const res = await fetch("/api/founders/security-deposit", { 
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: user.id, currency: region === 'international' ? 'USD' : 'INR' })
+                body: JSON.stringify({ 
+                    user_id: user.id, 
+                    currency: region === 'international' ? 'USD' : 'INR',
+                    ref_id: refId // Pass referral ID to track conversion
+                })
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Failed to initiate payment")
@@ -129,10 +136,17 @@ export function SetupBilling() {
         if (!user) return
         setIsDepositingWallet(true)
         try {
+            // Capture ref_id from tracking script if available
+            const refId = (window as any).BlackIndex?.getRefId()
+
             const res = await fetch("/api/founders/wallet", { 
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: user.id, currency: region === 'international' ? 'USD' : 'INR' })
+                body: JSON.stringify({ 
+                    user_id: user.id, 
+                    currency: region === 'international' ? 'USD' : 'INR',
+                    ref_id: refId // Pass referral ID to track conversion
+                })
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Failed to initiate deposit")

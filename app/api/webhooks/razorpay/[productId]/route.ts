@@ -75,7 +75,6 @@ export async function POST(
         if (event === 'subscription.charged') {
             // =============================================
             // SaaS SUBSCRIPTION RENEWAL (PRIMARY EVENT)
-            // Fires on every successful subscription charge
             // =============================================
             const subEntity = payload.payload?.subscription?.entity
             const payEntity = payload.payload?.payment?.entity
@@ -90,25 +89,32 @@ export async function POST(
                 || payEntity?.notes?.refId
 
             externalCustomerId = payEntity.email || subEntity?.customer_id || payEntity.id
-            externalTransactionId = payEntity.id // Payment ID is unique per charge
-            amount = payEntity.amount // in paise
+            externalTransactionId = payEntity.id
+            amount = payEntity.amount
             customerEmail = payEntity.email || ''
 
-        } else if (event === 'payment.captured') {
-            // One-time payment
+        } else if (event === 'payment.captured' || event === 'order.paid') {
+            // =============================================
+            // ONE-TIME PAYMENT (MANUAL OR TRACK.JS)
+            // =============================================
             const paymentEntity = payload.payload?.payment?.entity
+            const orderEntity = payload.payload?.order?.entity
 
-            if (!paymentEntity) {
-                return NextResponse.json({ error: 'Invalid payload structure' }, { status: 400 })
+            if (!paymentEntity && !orderEntity) {
+                return NextResponse.json({ error: 'Invalid payload structure (no payment or order entity)' }, { status: 400 })
             }
 
-            const { id: paymentId, amount: payAmount, email, notes } = paymentEntity
+            // Extract ref_id — Check Payment notes first, then Order notes (often used by track.js)
+            refId = paymentEntity?.notes?.ref_id 
+                || orderEntity?.notes?.ref_id
+                || paymentEntity?.notes?.refId
+                || orderEntity?.notes?.refId
+                || paymentEntity?.description?.match(/ref_id[:=]\s*([a-zA-Z0-9_-]+)/)?.[1] // Fallback regex from description
 
-            refId = notes?.ref_id || notes?.refId || notes?.referral_id
-            externalCustomerId = email || paymentEntity.contact || paymentId
-            externalTransactionId = paymentId
-            amount = payAmount
-            customerEmail = email || ''
+            externalCustomerId = paymentEntity?.email || orderEntity?.customer_id || paymentEntity?.id || orderEntity?.id
+            externalTransactionId = paymentEntity?.id || orderEntity?.id
+            amount = paymentEntity?.amount || orderEntity?.amount || 0
+            customerEmail = paymentEntity?.email || ''
 
         } else if (event === 'subscription.cancelled' || event === 'subscription.halted') {
             // Subscription cancelled or halted — update customer status
@@ -136,9 +142,21 @@ export async function POST(
         }
 
         if (!refId) {
+            console.warn(`[RAZORPAY WEBHOOK] Missing ref_id for product ${productId}. Event: ${event}`)
+            
+            // Log the failure for founder troubleshooting
+            await supabase.from('webhook_logs').insert({
+                product_id: productId,
+                event_type: event,
+                payload: payload,
+                status: 'error',
+                error_message: 'Missing ref_id in payment or order notes',
+                ip_address: request.headers.get('x-forwarded-for') || 'razorpay-webhook'
+            } as never)
+
             return NextResponse.json({
                 error: 'Missing ref_id in notes',
-                hint: 'Add ref_id in subscription/order notes when creating'
+                hint: 'Ensure your checkout form includes ref_id in notes'
             }, { status: 400 })
         }
 

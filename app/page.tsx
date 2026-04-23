@@ -3,7 +3,7 @@ import { HeroSection } from "@/components/sections/hero"
 import { OverviewSection } from "@/components/sections/overview"
 import { HowItWorksSection } from "@/components/sections/how-it-works"
 import { EarningsSection } from "@/components/sections/earnings"
-import { ProductsSection } from "@/components/sections/products"
+import { TheMathsSection } from "@/components/sections/the-maths"
 import { LeaderboardSection } from "@/components/sections/leaderboard"
 import { JoinSection } from "@/components/sections/join"
 import { Footer } from "@/components/sections/footer"
@@ -20,7 +20,7 @@ export default function MainSitePage() {
                 <OverviewSection />
                 <HowItWorksSection />
                 <EarningsSection />
-                <ProductsSection />
+                <TheMathsSection />
                 <LeaderboardSection />
                 <JoinSection />
                 <Footer />

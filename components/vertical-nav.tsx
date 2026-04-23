@@ -9,7 +9,7 @@ const navItems = [
   { id: "overview", label: "Overview", icon: Layers },
   { id: "how-it-works", label: "How It Works", icon: Workflow },
   { id: "earnings", label: "Earnings", icon: TrendingUp },
-  { id: "products", label: "Products", icon: Package },
+  { id: "the-maths", label: "The Maths", icon: Package },
   { id: "leaderboard", label: "Leaderboard", icon: Trophy },
   { id: "join", label: "Join", icon: UserPlus },
 ]

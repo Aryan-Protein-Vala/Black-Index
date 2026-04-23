@@ -639,6 +639,37 @@ function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; 
                                             </button>
                                         </div>
                                     </div>
+
+                                    {/* Webhook URL — the actual URL to paste in Razorpay */}
+                                    <div className="p-4 rounded-lg border border-blue-500/20 bg-blue-500/5">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-xs font-medium text-blue-400 uppercase opacity-80">Webhook URL</h4>
+                                            <span className="text-[10px] text-blue-400/60 font-mono">Paste this in Razorpay / Stripe</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                readOnly
+                                                value={`https://blackindex.in/api/webhooks/razorpay/${webhookProduct.id}`}
+                                                className="flex-1 px-3 py-2 text-xs bg-black/30 border border-blue-500/20 rounded-lg font-mono text-blue-400/90"
+                                            />
+                                            <button
+                                                onClick={() => handleCopyUrl(`https://blackindex.in/api/webhooks/razorpay/${webhookProduct.id}`, 'webhookurl')}
+                                                className={cn(
+                                                    "px-3 py-2 rounded-lg border transition-all text-xs",
+                                                    copiedUrl === 'webhookurl'
+                                                        ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
+                                                        : "border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-400/70"
+                                                )}
+                                            >
+                                                {copiedUrl === 'webhookurl' ? (
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                ) : (
+                                                    <Copy className="w-4 h-4" />
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Link to Documentation */}

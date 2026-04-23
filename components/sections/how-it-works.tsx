@@ -8,7 +8,7 @@ import { FadeInSection } from "@/components/ui/fade-in-section"
 const steps = [
   {
     title: "Automated Splits",
-    caption: "Founders never have to manually pay affiliates. Stripe and Razorpay handle the 70/30 split at checkout.",
+    caption: "Founders set their own commission rates. Stripe and Razorpay handle the split automatically at checkout.",
     icon: Split,
   },
   {

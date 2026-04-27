@@ -74,10 +74,12 @@ export function ProductTour({ steps, tourType, run: initialRun }: ProductTourPro
     }, [initialRun])
 
     const handleJoyrideCallback = async (data: CallBackProps) => {
-        const { status } = data
+        const { status, type } = data
+        console.log('Joyride Callback:', data)
+
         const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED]
 
-        if (finishedStatuses.includes(status)) {
+        if (finishedStatuses.includes(status) || type === 'tour:end') {
             setRun(false)
             
             // Mark tour as seen in database

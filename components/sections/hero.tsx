@@ -69,21 +69,29 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.8 }}
         >
-          <Link href={user ? "/dashboard" : "/signup"}>
-            <Button className="mt-12 h-12 px-8 text-sm font-normal tracking-tight bg-foreground text-background hover:bg-foreground/90 transition-all duration-300 group shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_30px_rgba(255,255,255,0.1)]">
-              {user ? (
-                <>
-                  Go to Dashboard
-                  <LayoutDashboard className="ml-2 w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
-                </>
-              ) : (
-                <>
-                  Join the Network
-                  <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </>
-              )}
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center gap-4 mt-12">
+            <Link href={user ? "/dashboard" : "/signup"} className="w-full sm:w-auto">
+              <Button className="w-full h-12 px-8 text-sm font-normal tracking-tight bg-foreground text-background hover:bg-foreground/90 transition-all duration-300 group shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                {user ? (
+                  <>
+                    Go to Dashboard
+                    <LayoutDashboard className="ml-2 w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
+                  </>
+                ) : (
+                  <>
+                    Join the Network
+                    <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+                  </>
+                )}
+              </Button>
+            </Link>
+            <Link href="/protocol" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full h-12 px-8 text-sm font-normal tracking-tight border-border/50 hover:bg-foreground/5 transition-all duration-300 group">
+                What is Black Index?
+                <ArrowRight className="ml-2 w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform duration-300" />
+              </Button>
+            </Link>
+          </div>
         </motion.div>
       </motion.div>
     </section>

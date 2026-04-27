@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Joyride, CallBackProps, STATUS, Step, TooltipRenderProps } from "react-joyride"
 import { useAuth } from "@/components/auth-provider"
+import { toast } from "sonner"
 
 interface ProductTourProps {
     steps: Step[]
@@ -81,15 +82,22 @@ export function ProductTour({ steps, tourType, run: initialRun }: ProductTourPro
             
             // Mark tour as seen in database
             try {
-                await fetch('/api/user/onboarding', {
+                const res = await fetch('/api/user/onboarding', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ tourType })
                 })
+                
+                if (!res.ok) {
+                    throw new Error('API failed to update tour state')
+                }
+
                 // Refresh local profile state so it doesn't pop up again before a hard refresh
                 await refreshProfile()
+                toast.success("Tour finished! You won't see this again.")
             } catch (error) {
                 console.error('Failed to save tour completion status:', error)
+                toast.error("Failed to save tour state. It might appear again.")
             }
         }
     }

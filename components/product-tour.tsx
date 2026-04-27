@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Joyride, { CallBackProps, STATUS, Step } from "react-joyride"
+import { Joyride, CallBackProps, STATUS, Step } from "react-joyride"
 
 interface ProductTourProps {
     steps: Step[]

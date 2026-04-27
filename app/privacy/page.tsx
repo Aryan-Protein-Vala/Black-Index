@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { Logo } from "@/components/logo"
+import { Footer } from "@/components/sections/footer"
 
 const sections = [
   {
@@ -129,6 +130,7 @@ export default function PrivacyPage() {
           </motion.div>
         </div>
       </main>
+      <Footer />
     </div>
   )
 }

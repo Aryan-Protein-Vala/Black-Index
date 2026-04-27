@@ -177,10 +177,10 @@ export default function ProtocolPage() {
                     <section className="mb-32">
                         <h2 className="text-3xl font-light mb-12 tracking-tight flex items-center gap-4">
                             <TrendingUp className="w-8 h-8 text-muted-foreground" />
-                            The "God Mode" Commission Engine
+                            Hybrid Commission Engine
                         </h2>
                         <p className="text-lg text-muted-foreground font-light mb-12">
-                            We replaced standard 10% affiliate links with a Hybrid Incentive Model designed to create "Golden Handcuffs" for sellers.
+                            We replaced standard 10% affiliate links with a flexible Hybrid Incentive Model designed to create long-term alignment between founders and sellers.
                         </p>
 
                         <div className="overflow-x-auto rounded-2xl border border-border/30 bg-black/20">
@@ -200,8 +200,8 @@ export default function ProtocolPage() {
                                                 <span className="font-medium text-foreground">Activation Bonus (The Hook)</span>
                                             </div>
                                         </td>
-                                        <td className="p-6 text-muted-foreground">~40% of Month 1 Revenue</td>
-                                        <td className="p-6 text-muted-foreground">Instant cash flow for the Warlord. High dopamine hit to encourage continuous selling.</td>
+                                        <td className="p-6 text-muted-foreground">Founder Defined (e.g. 20-50%)</td>
+                                        <td className="p-6 text-muted-foreground">High upfront payout for the first month's revenue. Designed to provide instant cash flow and motivation for Warlords.</td>
                                     </tr>
                                     <tr className="hover:bg-foreground/5 transition-colors">
                                         <td className="p-6">
@@ -210,21 +210,46 @@ export default function ProtocolPage() {
                                                 <span className="font-medium text-foreground">∞ Royalty Mode (Retention)</span>
                                             </div>
                                         </td>
-                                        <td className="p-6 text-muted-foreground">~15% Recurring for 12 Months</td>
-                                        <td className="p-6 text-muted-foreground">Creates passive income. Warlords never leave because they build a "Salary" on Black Index.</td>
+                                        <td className="p-6 text-muted-foreground">Founder Defined (e.g. 10-20%)</td>
+                                        <td className="p-6 text-muted-foreground">Recurring monthly commission. This creates a stable "salary" for Warlords, ensuring they stay focused on your product's long-term growth.</td>
                                     </tr>
                                     <tr className="hover:bg-foreground/5 transition-colors">
                                         <td className="p-6">
                                             <div className="flex items-center gap-2">
                                                 <Package className="w-4 h-4 text-blue-500" />
-                                                <span className="font-medium text-foreground">One-Time Assets</span>
+                                                <span className="font-medium text-foreground">One-Time Bounties</span>
                                             </div>
                                         </td>
-                                        <td className="p-6 text-muted-foreground">Flat 30-50% commission</td>
-                                        <td className="p-6 text-muted-foreground">Perfect for one-off lifetime deals, software templates, or info-products.</td>
+                                        <td className="p-6 text-muted-foreground">Founder Defined (e.g. 30-70%)</td>
+                                        <td className="p-6 text-muted-foreground">Perfect for one-off lifetime deals, software templates, or professional services.</td>
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+
+                        <div className="mt-12 p-8 rounded-2xl border border-border/30 bg-foreground/5">
+                            <h3 className="text-xl font-medium mb-4 flex items-center gap-2">
+                                <Coins className="w-5 h-5 text-emerald-400" />
+                                How Commissions are Set
+                            </h3>
+                            <div className="grid md:grid-cols-2 gap-8 text-sm font-light text-muted-foreground leading-relaxed">
+                                <div className="space-y-4">
+                                    <p>
+                                        Founders have absolute control over their commission structures. When listing a product, you define the <span className="text-foreground">Activation Bonus</span>, the <span className="text-foreground">Recurring Percentage</span>, and the <span className="text-foreground">Duration</span> of the royalty.
+                                    </p>
+                                    <p>
+                                        This allow founders to calculate their CAC (Customer Acquisition Cost) with 100% precision. You only pay for what you earn.
+                                    </p>
+                                </div>
+                                <div className="space-y-4">
+                                    <p>
+                                        Warlords choose which products to promote based on these metrics. Higher commissions attract more "Elite" sellers, while recurring royalties build a loyal, long-term sales force for your brand.
+                                    </p>
+                                    <p>
+                                        The platform fee is a flat 5% on top of the transaction value, which covers the trustless tracking, automated split logic, and secure payouts.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </section>
                 </FadeInSection>

@@ -1,4 +1,8 @@
-export function Footer() {
+interface FooterProps {
+  showCopyright?: boolean
+}
+
+export function Footer({ showCopyright = true }: FooterProps) {
   return (
     <footer className="py-12 px-6 lg:px-12 border-t border-border/30 bg-background/50">
       <div className="max-w-5xl mx-auto">
@@ -13,10 +17,12 @@ export function Footer() {
             <a href="/disclaimer" className="text-xs font-light text-muted-foreground/70 hover:text-foreground transition-colors">Disclaimer</a>
           </div>
         </div>
-        <div className="flex items-center justify-between border-t border-border/10 pt-8">
-          <span className="text-xs font-light text-muted-foreground/50 tracking-wider">© 2025 Black Index</span>
-          <span className="text-xs font-light text-muted-foreground/30 tracking-widest uppercase">Stealth</span>
-        </div>
+        {showCopyright && (
+          <div className="flex items-center justify-between border-t border-border/10 pt-8">
+            <span className="text-xs font-light text-muted-foreground/50 tracking-wider">© 2025 Black Index</span>
+            <span className="text-xs font-light text-muted-foreground/30 tracking-widest uppercase">Stealth</span>
+          </div>
+        )}
       </div>
     </footer>
   )

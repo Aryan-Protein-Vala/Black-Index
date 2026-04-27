@@ -132,3 +132,29 @@ export interface CommissionConfig {
     recurring_pct?: number
     max_recurring_months?: number
 }
+
+// Database type for Supabase client generics
+// This is a minimal type stub — for full type safety, generate types
+// with `npx supabase gen types typescript`
+export type Database = {
+    public: {
+        Tables: {
+            profiles: { Row: Profile; Insert: Partial<Profile>; Update: Partial<Profile> }
+            products: { Row: Product; Insert: Partial<Product>; Update: Partial<Product> }
+            transactions: { Row: Transaction; Insert: Partial<Transaction>; Update: Partial<Transaction> }
+            links: { Row: Link; Insert: Partial<Link>; Update: Partial<Link> }
+            customers: { Row: SaasCustomer; Insert: Partial<SaasCustomer>; Update: Partial<SaasCustomer> }
+            notifications: { Row: Notification; Insert: Partial<Notification>; Update: Partial<Notification> }
+            fraud_reports: { Row: FraudReport; Insert: Partial<FraudReport>; Update: Partial<FraudReport> }
+            founder_deposits: { Row: FounderDeposit; Insert: Partial<FounderDeposit>; Update: Partial<FounderDeposit> }
+            webhook_logs: { Row: any; Insert: any; Update: any }
+            charge_schedules: { Row: any; Insert: any; Update: any }
+            featured_payments: { Row: any; Insert: any; Update: any }
+            payments: { Row: any; Insert: any; Update: any }
+            [key: string]: { Row: any; Insert: any; Update: any }
+        }
+        Views: { [key: string]: { Row: any } }
+        Functions: { [key: string]: { Args: any; Returns: any } }
+        Enums: { [key: string]: string }
+    }
+}

@@ -33,8 +33,8 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    // Refresh session if expired
-    const { data: { session } } = await supabase.auth.getSession()
+    // Validate auth token server-side (getUser verifies with Supabase, getSession does not)
+    const { data: { user } } = await supabase.auth.getUser()
 
     // Protected routes - redirect to login if not authenticated
     const protectedRoutes = ['/dashboard']
@@ -42,7 +42,7 @@ export async function middleware(request: NextRequest) {
         request.nextUrl.pathname.startsWith(route)
     )
 
-    if (isProtectedRoute && !session) {
+    if (isProtectedRoute && !user) {
         const redirectUrl = new URL('/login', request.url)
         redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
         return NextResponse.redirect(redirectUrl)
@@ -54,7 +54,7 @@ export async function middleware(request: NextRequest) {
         request.nextUrl.pathname.startsWith(route)
     )
 
-    if (isAuthRoute && session) {
+    if (isAuthRoute && user) {
         return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 

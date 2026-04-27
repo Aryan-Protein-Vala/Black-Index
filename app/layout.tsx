@@ -93,9 +93,9 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-icon.svg",
   },
-  verification: {
-    google: "your-google-verification-code", // Add your Google Search Console verification
-  }
+  // verification: {
+  //   google: "your-google-verification-code", // TODO: Add real Google Search Console verification
+  // }
 }
 
 export const viewport: Viewport = {

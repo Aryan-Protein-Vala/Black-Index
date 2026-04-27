@@ -70,32 +70,42 @@ export async function GET(request: NextRequest) {
 
         for (const [sellerId, amount] of Object.entries(sellerAmounts)) {
             try {
-                // Get current balances
-                const { data: profile, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('pending_balance, withdrawable_balance')
-                    .eq('id', sellerId)
-                    .single()
+                // Use atomic RPC to move funds from pending to withdrawable
+                // This uses release_cleared_funds(p_seller_id, p_amount) defined in additional-schema.sql
+                const { error: rpcError } = await supabase.rpc('release_cleared_funds' as any, {
+                    p_seller_id: sellerId,
+                    p_amount: amount,
+                } as any)
 
-                if (profileError || !profile) {
-                    console.error('[ESCROW RELEASE] Failed to get profile for', sellerId)
-                    continue
-                }
+                if (rpcError) {
+                    // Fallback: read-then-write (log warning)
+                    console.warn('[ESCROW RELEASE] RPC fallback for', sellerId, rpcError.message)
+                    
+                    const { data: profile, error: profileError } = await supabase
+                        .from('profiles')
+                        .select('pending_balance, withdrawable_balance')
+                        .eq('id', sellerId)
+                        .single()
 
-                const typedProfile = profile as { pending_balance: number; withdrawable_balance: number }
+                    if (profileError || !profile) {
+                        console.error('[ESCROW RELEASE] Failed to get profile for', sellerId)
+                        continue
+                    }
 
-                // Move from pending to withdrawable
-                const { error: updateError } = await supabase
-                    .from('profiles')
-                    .update({
-                        pending_balance: Math.max(0, (typedProfile.pending_balance || 0) - amount),
-                        withdrawable_balance: (typedProfile.withdrawable_balance || 0) + amount,
-                    } as never)
-                    .eq('id', sellerId)
+                    const typedProfile = profile as { pending_balance: number; withdrawable_balance: number }
 
-                if (updateError) {
-                    console.error('[ESCROW RELEASE] Failed to update balance for', sellerId, updateError)
-                    continue
+                    const { error: updateError } = await supabase
+                        .from('profiles')
+                        .update({
+                            pending_balance: Math.max(0, (typedProfile.pending_balance || 0) - amount),
+                            withdrawable_balance: (typedProfile.withdrawable_balance || 0) + amount,
+                        } as never)
+                        .eq('id', sellerId)
+
+                    if (updateError) {
+                        console.error('[ESCROW RELEASE] Failed to update balance for', sellerId, updateError)
+                        continue
+                    }
                 }
 
                 successCount++

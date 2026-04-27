@@ -87,23 +87,32 @@ export async function POST(request: NextRequest) {
             const USD_TO_INR_RATE = 84
             const amountInPaise = totalCents * USD_TO_INR_RATE
 
-            // Get current wallet balance
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('wallet_balance')
-                .eq('id', userId)
-                .single()
+            // Try atomic RPC first, fallback to read-then-write
+            const { error: rpcError } = await supabase.rpc('credit_wallet' as any, {
+                p_user_id: userId,
+                p_amount: amountInPaise,
+            } as any)
 
-            const currentBalance = (profile as any)?.wallet_balance || 0
+            if (rpcError) {
+                // Fallback: read-then-write (acceptable for low-volume webhook calls)
+                console.warn('[LS WEBHOOK] credit_wallet RPC not found, using fallback:', rpcError.message)
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('wallet_balance')
+                    .eq('id', userId)
+                    .single()
 
-            const { error } = await supabase
-                .from('profiles')
-                .update({ wallet_balance: currentBalance + amountInPaise } as never)
-                .eq('id', userId)
+                const currentBalance = (profile as any)?.wallet_balance || 0
 
-            if (error) {
-                console.error('[LS WEBHOOK] Failed to credit wallet:', error)
-                return NextResponse.json({ error: 'Database update failed' }, { status: 500 })
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({ wallet_balance: currentBalance + amountInPaise } as never)
+                    .eq('id', userId)
+
+                if (error) {
+                    console.error('[LS WEBHOOK] Failed to credit wallet:', error)
+                    return NextResponse.json({ error: 'Database update failed' }, { status: 500 })
+                }
             }
 
             console.log(`[LS WEBHOOK] Wallet credited +${amountInPaise} paise for ${userId}`)

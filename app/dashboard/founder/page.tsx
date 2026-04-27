@@ -21,6 +21,7 @@ import { formatCurrency } from "@/hooks/use-dashboard-data"
 import type { Product, Transaction } from "@/lib/database.types"
 import { SetupBilling } from "@/components/founder/setup-billing"
 import { toast } from "sonner"
+import { ProductTour } from "@/components/product-tour"
 
 const sidebarItems = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -83,6 +84,7 @@ function OverviewTab({ products, transactions, isLoading }: {
         <div className="space-y-6">
             {/* Stats Row */}
             <motion.div
+                id="tour-founder-overview"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.1 }}
@@ -952,6 +954,34 @@ export default function FounderDashboard() {
 
     return (
         <div className="min-h-screen w-full overflow-x-hidden bg-background">
+            {/* Product Tour Genie */}
+            {profile && (
+                <ProductTour 
+                    tourType="founder"
+                    run={!(profile as any).has_seen_founder_tour}
+                    steps={[
+                        {
+                            target: "body",
+                            content: "Welcome to the Warlord Tier! 👑 As a Founder, you can list your software products, set up automated commission splits, and let an army of affiliates sell for you.",
+                            placement: "center",
+                            disableBeacon: true,
+                        },
+                        {
+                            target: "#tour-founder-overview",
+                            content: "This is your command center. Track your active subscribers, total revenue, and commissions paid to affiliates.",
+                        },
+                        {
+                            target: "#tour-founder-billing-tab",
+                            content: "This is the Billing tab. Here, you manage your Wallet (which automatically pays out your affiliates) and your Security Deposit.",
+                        },
+                        {
+                            target: "#tour-founder-products-tab",
+                            content: "Ready to launch? Click 'My Products' to add your software to The Vault. You'll set your commission rates and get your webhook secret here.",
+                        }
+                    ]}
+                />
+            )}
+
             {/* Grain overlay */}
             <div className="grain-overlay" />
 
@@ -984,6 +1014,7 @@ export default function FounderDashboard() {
                                     transition={{ delay: index * 0.05 + 0.2 }}
                                 >
                                     <button
+                                        id={`tour-founder-${item.id}-tab`}
                                         onClick={() => setActiveTab(item.id)}
                                         className={cn(
                                             "w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-lg transition-all duration-300 cursor-pointer",

@@ -102,22 +102,57 @@ export async function POST(request: NextRequest) {
                 .eq('id', user.id)
         }
 
-        // Create payout
-        const payout = await createPayout({
-            fundAccountId,
-            amount,
-            purpose: 'payout',
-            referenceId: `withdrawal_${user.id}_${Date.now()}`,
-        })
+        // STEP 1: Atomically deduct balance BEFORE initiating payout
+        // This prevents double-spend if concurrent withdrawals are attempted
+        const { data: payoutResult, error: rpcError } = await adminClient.rpc('process_payout' as any, {
+            p_seller_id: user.id,
+            p_amount: amount,
+        } as any)
 
-        // Deduct from withdrawable balance
+        if (rpcError || payoutResult === false) {
+            // Fallback: try direct deduction with guard
+            const { error: deductError } = await adminClient
+                .from('profiles')
+                .update({
+                    withdrawable_balance: profileData.withdrawable_balance - amount,
+                } as never)
+                .eq('id', user.id)
+                .gte('withdrawable_balance', amount) // Guard: only deduct if still sufficient
+
+            if (deductError) {
+                return NextResponse.json({
+                    error: 'Withdrawal failed — balance may have changed',
+                }, { status: 409 })
+            }
+        }
+
+        // STEP 2: Create payout via RazorpayX
+        let payout
+        try {
+            payout = await createPayout({
+                fundAccountId,
+                amount,
+                purpose: 'payout',
+                referenceId: `withdrawal_${user.id}_${Date.now()}`,
+            })
+        } catch (payoutError) {
+            // Payout failed — RESTORE the balance
+            console.error('Payout creation failed, restoring balance:', payoutError)
+            await adminClient
+                .from('profiles')
+                .update({
+                    withdrawable_balance: profileData.withdrawable_balance,
+                } as never)
+                .eq('id', user.id)
+
+            return NextResponse.json({
+                error: 'Payout creation failed. Balance has been restored.',
+            }, { status: 500 })
+        }
+
         const newBalance = profileData.withdrawable_balance - amount
-        await adminClient
-            .from('profiles')
-            .update({ withdrawable_balance: newBalance } as never)
-            .eq('id', user.id)
 
-        // Create transaction record
+        // STEP 3: Create transaction record
         await adminClient
             .from('transactions')
             .insert({

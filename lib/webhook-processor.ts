@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { sendEmail } from '@/lib/email'
 import { saleRecordedEmail, founderSaleEmail } from '@/lib/email-templates'
+import { checkVelocityLimits } from '@/lib/velocity-limits'
 
 /**
  * Shared webhook processor for all payment providers
@@ -104,6 +105,30 @@ export async function processConversion(data: ConversionData): Promise<ProcessRe
         const sellerEmail = typedLink.seller?.email?.toLowerCase()
         if (sellerEmail && customerEmail && sellerEmail === customerEmail.toLowerCase()) {
             return { success: false, message: 'Self-referral blocked', error: 'SELF_REFERRAL' }
+        }
+
+        // ================================================
+        // STEP 3.5: VELOCITY LIMIT CHECK (Fraud Prevention)
+        // ================================================
+        try {
+            const velocityCheck = await checkVelocityLimits(
+                supabase,
+                typedProduct.founder_id,
+                typedLink.seller_id,
+                productId,
+                amount
+            )
+            if (!velocityCheck.allowed) {
+                console.warn(`[VELOCITY] Blocked: ${velocityCheck.reason}`)
+                return {
+                    success: false,
+                    message: `Rate limit exceeded: ${velocityCheck.reason}`,
+                    error: 'VELOCITY_LIMIT'
+                }
+            }
+        } catch (velError) {
+            // Don't block transactions if velocity check fails — log and continue
+            console.error('[VELOCITY] Check failed, proceeding:', velError)
         }
 
         // ================================================
@@ -302,7 +327,7 @@ export async function processConversion(data: ConversionData): Promise<ProcessRe
                 .eq('id', productId)
                 .single()
 
-            const productName = (productInfo as { name: string })?.name || 'Product'
+            const productName = ((productInfo as any)?.name as string) || 'Product'
 
             // In-app notification for seller
             await supabase.from('notifications').insert({
@@ -322,7 +347,7 @@ export async function processConversion(data: ConversionData): Promise<ProcessRe
                     .select('full_name')
                     .eq('id', typedLink.seller_id)
                     .single()
-                const sellerName = (sellerProfile as { full_name: string })?.full_name || ''
+                const sellerName = ((sellerProfile as any)?.full_name as string) || ''
                 await sendEmail({
                     to: sellerEmailAddr,
                     subject: `New sale: ₹${(netCommission / 100).toLocaleString('en-IN')} earned!`,

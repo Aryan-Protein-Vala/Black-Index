@@ -18,6 +18,7 @@ import { useAuth } from "@/components/auth-provider"
 import { useProducts, useLinks, useDashboardStats, formatCurrency, useTransactions } from "@/hooks/use-dashboard-data"
 import { BecomeSellerModal } from "@/components/become-seller-modal"
 import { PayoutPopover } from "@/components/seller/payout-popover"
+import { ProductTour } from "@/components/product-tour"
 
 // Tab configuration
 const sidebarItems = [
@@ -77,6 +78,7 @@ function OverviewTab({ stats, transactions }: { stats: ReturnType<typeof useDash
         <div className="space-y-6">
             {/* Stats Row */}
             <motion.div
+                id="tour-overview"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.1 }}
@@ -1064,6 +1066,38 @@ export default function UnifiedDashboard() {
 
     return (
         <div className="min-h-screen w-full overflow-x-hidden bg-background">
+            {/* Product Tour Genie */}
+            {profile && (
+                <ProductTour 
+                    tourType="seller"
+                    run={!(profile as any).has_seen_seller_tour}
+                    steps={[
+                        {
+                            target: "body",
+                            content: "Welcome to Black Index! 🚀 As a Warlord (Affiliate), your mission is to promote high-converting products and earn massive commissions. Let's show you around.",
+                            placement: "center",
+                            disableBeacon: true,
+                        },
+                        {
+                            target: "#tour-overview",
+                            content: "Here is your command center. Track your active subscriptions, projected monthly income, and overall conversions in real-time.",
+                        },
+                        {
+                            target: "#tour-vault-tab",
+                            content: "The Vault is our premium marketplace. Browse hand-picked, high-converting products here.",
+                        },
+                        {
+                            target: "#tour-links-tab",
+                            content: "Once you find a product in The Vault, grab your unique tracking link and it will appear here. Share this link to start earning!",
+                        },
+                        {
+                            target: "#tour-become-founder",
+                            content: "Ready to launch your own products? Upgrade to a Founder account to list your software in The Vault and recruit an army of Warlords to sell for you.",
+                        }
+                    ]}
+                />
+            )}
+
             {/* Grain overlay */}
             <div className="grain-overlay" />
 
@@ -1096,6 +1130,7 @@ export default function UnifiedDashboard() {
                                     transition={{ delay: index * 0.05 + 0.2 }}
                                 >
                                     <button
+                                        id={`tour-${item.id}-tab`}
                                         onClick={() => setActiveTab(item.id)}
                                         className={cn(
                                             "w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-lg transition-all duration-300 cursor-pointer",
@@ -1124,6 +1159,7 @@ export default function UnifiedDashboard() {
                         </Link>
                     ) : (
                         <button
+                            id="tour-become-founder"
                             onClick={() => setShowUpgradeModal(true)}
                             className="w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-lg bg-gradient-to-r from-amber-500/10 to-yellow-600/10 text-amber-500 hover:from-amber-500/20 hover:to-yellow-600/20 transition-all duration-300 cursor-pointer border border-amber-500/20"
                         >

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase-server'
+import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server'
 import Razorpay from 'razorpay'
 
 const razorpay = new Razorpay({
@@ -7,12 +7,29 @@ const razorpay = new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET!,
 })
 
+/**
+ * POST /api/founders/wallet
+ * Create order for wallet top-up
+ * SECURITY: Requires authentication. user_id is taken from session.
+ */
 export async function POST(request: NextRequest) {
+    // SECURITY: Authenticate the user
+    const authSupabase = await createServerSupabaseClient()
+    const { data: { user }, error: authError } = await authSupabase.auth.getUser()
+
+    if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = createAdminClient()
     const body = await request.json()
-    const { user_id, currency } = body
+    const { currency, user_id } = body
 
-    if (!user_id) return NextResponse.json({ error: 'Missing user_id' }, { status: 400 })
+    // SECURITY: user_id from body must match authenticated user (if provided)
+    if (user_id && user_id !== user.id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    const verifiedUserId = user.id
 
     // If USD, generate Lemon Squeezy Checkout
     if (currency === 'USD') {
@@ -31,7 +48,7 @@ export async function POST(request: NextRequest) {
                         type: "checkouts",
                         attributes: {
                             custom_price: lsAmountCents,
-                            checkout_data: { custom: { user_id, type: 'wallet_topup' } }
+                            checkout_data: { custom: { user_id: verifiedUserId, type: 'wallet_topup' } }
                         },
                         relationships: {
                             store: { data: { type: "stores", id: process.env.LEMONSQUEEZY_STORE_ID } },
@@ -54,12 +71,12 @@ export async function POST(request: NextRequest) {
         const order = await razorpay.orders.create({
             amount: depositAmountINR,
             currency: 'INR',
-            receipt: `wallet_${user_id.slice(0, 8)}_${Date.now()}`,
-            notes: { type: 'wallet_topup', founder_id: user_id }
+            receipt: `wallet_${verifiedUserId.slice(0, 8)}_${Date.now()}`,
+            notes: { type: 'wallet_topup', founder_id: verifiedUserId }
         })
 
         await supabase.from('founder_deposits').insert({
-            founder_id: user_id, type: 'wallet_topup', amount: depositAmountINR, status: 'pending', order_id: order.id
+            founder_id: verifiedUserId, type: 'wallet_topup', amount: depositAmountINR, status: 'pending', order_id: order.id
         } as never)
 
         return NextResponse.json({

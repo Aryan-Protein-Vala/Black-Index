@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase-server'
+import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server'
 import Razorpay from 'razorpay'
 
 const razorpay = new Razorpay({
@@ -47,19 +47,29 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+    // SECURITY: Authenticate the user
+    const authSupabase = await createServerSupabaseClient()
+    const { data: { user }, error: authError } = await authSupabase.auth.getUser()
+
+    if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = createAdminClient()
     const body = await request.json()
-    const { user_id, currency, ref_id } = body
+    const { currency, ref_id, user_id } = body
 
-    if (!user_id) {
-        return NextResponse.json({ error: 'Missing user_id' }, { status: 400 })
+    // SECURITY: user_id from body must match authenticated user (if provided)
+    if (user_id && user_id !== user.id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    const verifiedUserId = user.id
 
     // Check if already paid
     const { data: profile } = await supabase
         .from('profiles')
         .select('security_deposit_paid, full_name, email')
-        .eq('id', user_id)
+        .eq('id', verifiedUserId)
         .single()
 
     if ((profile as any)?.security_deposit_paid) {
@@ -88,7 +98,7 @@ export async function POST(request: NextRequest) {
                             },
                             checkout_data: {
                                 custom: {
-                                    user_id,
+                                    user_id: verifiedUserId,
                                     type: 'security_deposit',
                                     ref_id: ref_id || null,
                                 },
@@ -123,7 +133,7 @@ export async function POST(request: NextRequest) {
 
             // Record pending deposit
             await supabase.from('founder_deposits').insert({
-                founder_id: user_id,
+                founder_id: verifiedUserId,
                 type: 'security_deposit',
                 amount: SECURITY_DEPOSIT_USD,
                 currency: 'USD',
@@ -138,17 +148,17 @@ export async function POST(request: NextRequest) {
         const order = await razorpay.orders.create({
             amount: SECURITY_DEPOSIT_INR,
             currency: 'INR',
-            receipt: `sec_dep_${user_id.slice(0, 8)}`,
+            receipt: `sec_dep_${verifiedUserId.slice(0, 8)}`,
             notes: {
                 type: 'security_deposit',
-                founder_id: user_id,
+                founder_id: verifiedUserId,
                 ref_id: ref_id || null,
             }
         })
 
         // Record pending deposit
         await supabase.from('founder_deposits').insert({
-            founder_id: user_id,
+            founder_id: verifiedUserId,
             type: 'security_deposit',
             amount: SECURITY_DEPOSIT_INR,
             status: 'pending',

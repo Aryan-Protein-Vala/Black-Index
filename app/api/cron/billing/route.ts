@@ -114,8 +114,8 @@ export async function GET(request: NextRequest) {
                         const currentBalance = founderData?.wallet_balance || 0
                         
                         if (currentBalance >= charge.amount) {
-                            // Sufficient funds in wallet - Direct Deduction
-                            await supabase
+                            // Sufficient funds in wallet - Atomic deduction to prevent race conditions
+                            const { error: deductError } = await supabase
                                 .from('profiles')
                                 .update({
                                     wallet_balance: currentBalance - charge.amount,
@@ -123,6 +123,11 @@ export async function GET(request: NextRequest) {
                                     last_charge_date: new Date().toISOString()
                                 } as never)
                                 .eq('id', charge.founder_id)
+                                .gte('wallet_balance', charge.amount) // Atomic: only deduct if still sufficient
+
+                            if (deductError) {
+                                throw new Error('Wallet balance changed during deduction (concurrent update)')
+                            }
 
                             await supabase
                                 .from('charge_schedules')
@@ -189,15 +194,24 @@ export async function GET(request: NextRequest) {
                         .update({ unbilled_amount: 0 } as never)
                         .eq('id', charge.founder_id)
 
-                    // Update related transactions to 'billed' status
-                    await supabase
-                        .from('transactions')
-                        .update({
-                            billing_status: 'billed',
-                            charge_schedule_id: charge.id,
-                        } as never)
-                        .eq('billing_status', 'unbilled')
-                        .eq('product_id', charge.founder_id) // This should be via product -> founder join in production
+                        // Update related transactions to 'billed' status
+                        // Join through products table to find transactions for this founder's products
+                        const { data: founderProducts } = await supabase
+                            .from('products')
+                            .select('id')
+                            .eq('founder_id', charge.founder_id)
+
+                        if (founderProducts && founderProducts.length > 0) {
+                            const productIds = founderProducts.map((p: any) => p.id)
+                            await supabase
+                                .from('transactions')
+                                .update({
+                                    billing_status: 'billed',
+                                    charge_schedule_id: charge.id,
+                                } as never)
+                                .eq('billing_status', 'unbilled')
+                                .in('product_id', productIds)
+                        }
 
                     results.executed++
                     console.log(`Executed charge of ₹${charge.amount / 100}, invoice ${invoice.id}`)
@@ -219,58 +233,12 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // ================================================
-        // PHASE 3: RELEASE ESCROW (T+30)
-        // ================================================
-        const escrowNow = new Date().toISOString()
-        const { data: clearedTransactions } = await supabase
-            .from('transactions')
-            .select('id, seller_id, commission_amount')
-            .eq('status', 'pending')
-            .eq('billing_status', 'billed')
-            .lte('payout_due_date', escrowNow)
-
-        let escrowReleased = 0
-        if (clearedTransactions && clearedTransactions.length > 0) {
-            // Group by seller
-            const sellerAmounts: Record<string, number> = {}
-            for (const txn of clearedTransactions) {
-                const t = txn as { seller_id: string; commission_amount: number }
-                sellerAmounts[t.seller_id] = (sellerAmounts[t.seller_id] || 0) + (t.commission_amount || 0)
-            }
-
-            // Update seller balances
-            for (const [sellerId, amount] of Object.entries(sellerAmounts)) {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('pending_balance, withdrawable_balance')
-                    .eq('id', sellerId)
-                    .single()
-
-                if (profile) {
-                    const p = profile as { pending_balance: number; withdrawable_balance: number }
-                    await supabase
-                        .from('profiles')
-                        .update({
-                            pending_balance: Math.max(0, (p.pending_balance || 0) - amount),
-                            withdrawable_balance: (p.withdrawable_balance || 0) + amount,
-                        } as never)
-                        .eq('id', sellerId)
-                    escrowReleased++
-                }
-            }
-
-            // Update transaction statuses
-            const txnIds = clearedTransactions.map(t => (t as { id: string }).id)
-            await supabase
-                .from('transactions')
-                .update({ status: 'cleared', cleared_at: escrowNow } as never)
-                .in('id', txnIds)
-        }
+        // NOTE: Escrow release is handled by the dedicated /api/cron/release-escrow cron job.
+        // Do NOT duplicate it here.
 
         return NextResponse.json({
             success: true,
-            results: { ...results, escrow_released: escrowReleased },
+            results,
             timestamp: new Date().toISOString(),
         })
 

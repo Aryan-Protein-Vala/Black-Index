@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
     try {
@@ -18,8 +18,9 @@ export async function POST(request: NextRequest) {
 
         const columnToUpdate = tourType === 'seller' ? 'has_seen_seller_tour' : 'has_seen_founder_tour'
 
-        // Update the profile to mark the tour as seen
-        const { error: updateError } = await supabase
+        // SECURITY: Use admin client to bypass RLS since users cannot update their own profile columns directly
+        const adminClient = createAdminClient()
+        const { error: updateError } = await adminClient
             .from('profiles')
             .update({ [columnToUpdate]: true } as never)
             .eq('id', user.id)

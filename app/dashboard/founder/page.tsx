@@ -962,7 +962,7 @@ export default function FounderDashboard() {
                     steps={[
                         {
                             target: "body",
-                            content: "Welcome to the Warlord Tier! 👑 As a Founder, you can list your software products, set up automated commission splits, and let an army of affiliates sell for you.",
+                            content: "Welcome to the Founder Tier! 👑 As a Founder, you can list your software products, set up automated commission splits, and let an army of affiliates sell for you.",
                             placement: "center",
                             disableBeacon: true,
                         },

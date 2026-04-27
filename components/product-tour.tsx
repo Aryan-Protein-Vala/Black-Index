@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Joyride, CallBackProps, STATUS, Step } from "react-joyride"
+import { Joyride, CallBackProps, STATUS, Step, TooltipRenderProps } from "react-joyride"
+import { useAuth } from "@/components/auth-provider"
 
 interface ProductTourProps {
     steps: Step[]
@@ -9,8 +10,58 @@ interface ProductTourProps {
     run: boolean
 }
 
+// Custom Tooltip using Black Index aesthetics
+const CustomTooltip = ({
+    index,
+    step,
+    backProps,
+    closeProps,
+    primaryProps,
+    skipProps,
+    tooltipProps,
+    isLastStep,
+}: TooltipRenderProps) => {
+    return (
+        <div 
+            {...tooltipProps} 
+            className="bg-[#141414] border border-[#2a2a2a] rounded-xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.8)] p-6 w-[350px] font-sans"
+        >
+            {step.title && <h3 className="text-lg font-light tracking-tight mb-2">{step.title}</h3>}
+            <div className="text-sm text-muted-foreground font-light leading-relaxed mb-6">
+                {step.content}
+            </div>
+            
+            <div className="flex items-center justify-between mt-4">
+                <button
+                    {...skipProps}
+                    className="text-xs font-light text-muted-foreground hover:text-white transition-colors"
+                >
+                    Skip Tour
+                </button>
+                <div className="flex gap-2">
+                    {index > 0 && (
+                        <button
+                            {...backProps}
+                            className="px-4 py-2 text-xs font-light text-muted-foreground hover:text-white transition-all border border-[#2a2a2a] bg-white/5 rounded-lg hover:bg-white/10"
+                        >
+                            Back
+                        </button>
+                    )}
+                    <button
+                        {...primaryProps}
+                        className="px-5 py-2 text-xs font-medium bg-white text-black rounded-lg hover:bg-white/90 transition-colors shadow-lg"
+                    >
+                        {isLastStep ? 'Finish' : 'Next'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export function ProductTour({ steps, tourType, run: initialRun }: ProductTourProps) {
     const [run, setRun] = useState(false)
+    const { refreshProfile } = useAuth()
 
     // Only start the tour after mount to avoid hydration mismatch
     useEffect(() => {
@@ -35,6 +86,8 @@ export function ProductTour({ steps, tourType, run: initialRun }: ProductTourPro
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ tourType })
                 })
+                // Refresh local profile state so it doesn't pop up again before a hard refresh
+                await refreshProfile()
             } catch (error) {
                 console.error('Failed to save tour completion status:', error)
             }
@@ -52,46 +105,12 @@ export function ProductTour({ steps, tourType, run: initialRun }: ProductTourPro
             showProgress={true}
             showSkipButton={true}
             callback={handleJoyrideCallback}
+            tooltipComponent={CustomTooltip}
             styles={{
                 options: {
-                    primaryColor: '#ffffff', // Button color
-                    textColor: '#ffffff',
-                    backgroundColor: '#141414',
-                    overlayColor: 'rgba(0, 0, 0, 0.85)',
                     zIndex: 1000,
-                },
-                tooltip: {
-                    borderRadius: '12px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                },
-                tooltipContainer: {
-                    textAlign: 'left',
-                },
-                buttonNext: {
-                    backgroundColor: '#ffffff',
-                    color: '#000000',
-                    fontSize: '14px',
-                    borderRadius: '8px',
-                    padding: '8px 16px',
-                    fontWeight: 500,
-                },
-                buttonBack: {
-                    color: '#a1a1aa', // text-muted-foreground
-                    marginRight: '10px',
-                    fontSize: '14px',
-                },
-                buttonSkip: {
-                    color: '#a1a1aa',
-                    fontSize: '14px',
-                },
-                buttonClose: {
-                    display: 'none', // Hide the tiny X in favor of the Skip button
+                    overlayColor: 'rgba(0, 0, 0, 0.85)',
                 }
-            }}
-            locale={{
-                last: 'Finish',
-                skip: 'Skip Tour',
             }}
         />
     )

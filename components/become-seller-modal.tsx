@@ -13,7 +13,7 @@ interface BecomeSellerModalProps {
 }
 
 const SELLER_PRICING = {
-    price: 499, // ₹499/month
+    price: "Free", // Free for 2026
     features: [
         "List unlimited products",
         "Set your own commission rates",
@@ -33,15 +33,7 @@ export function BecomeSellerModal({ isOpen, onClose, onSuccess }: BecomeSellerMo
         setError("")
 
         try {
-            // Fetch Razorpay config from server
-            const configRes = await fetch("/api/config/razorpay")
-            const configData = await configRes.json()
-            
-            if (!configRes.ok || !configData.keyId) {
-                throw new Error("Payment system unavailable")
-            }
-
-            // Create Razorpay order
+            // Direct upgrade (Free for 2026)
             const response = await fetch("/api/founders/upgrade", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -50,48 +42,11 @@ export function BecomeSellerModal({ isOpen, onClose, onSuccess }: BecomeSellerMo
             const data = await response.json()
 
             if (!response.ok) {
-                throw new Error(data.error || "Failed to create order")
+                throw new Error(data.error || "Failed to upgrade")
             }
 
-            // Open Razorpay checkout
-            const options = {
-                key: configData.keyId,
-                amount: SELLER_PRICING.price * 100, // In paise
-                currency: "INR",
-                name: "Black Index",
-                description: "Become a Seller - Monthly Subscription",
-                order_id: data.orderId,
-                handler: async function (response: any) {
-                    // Verify payment
-                    const verifyRes = await fetch("/api/founders/upgrade/verify", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            razorpay_order_id: response.razorpay_order_id,
-                            razorpay_payment_id: response.razorpay_payment_id,
-                            razorpay_signature: response.razorpay_signature,
-                        }),
-                    })
-
-                    if (verifyRes.ok) {
-                        onSuccess()
-                        onClose()
-                    } else {
-                        setError("Payment verification failed")
-                    }
-                },
-                prefill: {
-                    email: data.email,
-                    contact: data.phone || "",
-                },
-                theme: {
-                    color: "#000000",
-                },
-            }
-
-            // @ts-ignore - Razorpay is loaded via script
-            const razorpay = new window.Razorpay(options)
-            razorpay.open()
+            onSuccess()
+            onClose()
 
         } catch (err) {
             setError(err instanceof Error ? err.message : "Something went wrong")
@@ -149,10 +104,10 @@ export function BecomeSellerModal({ isOpen, onClose, onSuccess }: BecomeSellerMo
                             {/* Pricing */}
                             <div className="text-center mb-6">
                                 <div className="inline-flex items-baseline gap-1">
-                                    <span className="text-4xl font-light">₹{SELLER_PRICING.price}</span>
-                                    <span className="text-muted-foreground text-sm">/month</span>
+                                    <span className="text-4xl font-light text-amber-500">Free</span>
+                                    <span className="text-muted-foreground text-sm">for 2026</span>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1">Cancel anytime</p>
+                                <p className="text-xs text-muted-foreground mt-1">No credit card required</p>
                             </div>
 
                             {/* Features */}
@@ -192,7 +147,7 @@ export function BecomeSellerModal({ isOpen, onClose, onSuccess }: BecomeSellerMo
                             </Button>
 
                             <p className="text-[10px] text-muted-foreground text-center mt-4">
-                                Secure payment powered by Razorpay
+                                Limited time offer — Access ends Dec 31, 2026
                             </p>
                         </SpotlightCard>
                     </motion.div>

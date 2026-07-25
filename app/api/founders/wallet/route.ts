@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server'
 import Razorpay from 'razorpay'
 
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID!,
-    key_secret: process.env.RAZORPAY_KEY_SECRET!,
-})
+// Razorpay initialization moved inside POST to avoid build errors
 
 /**
  * POST /api/founders/wallet
@@ -68,6 +65,11 @@ export async function POST(request: NextRequest) {
     // If INR, generate Razorpay Order
     const depositAmountINR = 1000000 // ₹10,000 in paise
     try {
+        const razorpay = new Razorpay({
+            key_id: process.env.RAZORPAY_KEY_ID!,
+            key_secret: process.env.RAZORPAY_KEY_SECRET!,
+        });
+
         const order = await razorpay.orders.create({
             amount: depositAmountINR,
             currency: 'INR',

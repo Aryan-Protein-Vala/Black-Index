@@ -696,9 +696,9 @@ function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; 
                                         variant="outline"
                                     >
                                         {testingWebhook ? (
-                                            <><Loader2 className="w-3 h-3 mr-2 animate-spin" />Testing...</>
+                                            <><Loader2 className="w-3 h-3 mr-2 animate-spin" />Verifying...</>
                                         ) : (
-                                            'Test Integration'
+                                            'Verify Local Config'
                                         )}
                                     </Button>
                                     {webhookTestResult && (

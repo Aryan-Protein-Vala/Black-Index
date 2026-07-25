@@ -89,28 +89,47 @@
      * Monkey-patch Stripe Checkout to auto-inject ref_id
      */
     function patchStripeCheckout() {
-        if (typeof window.Stripe === 'undefined') return;
+        let _stripe;
+        
+        function applyPatch(original) {
+            const stripeFunc = function(...args) {
+                const stripe = original.apply(this, args);
+                const originalRedirectToCheckout = stripe.redirectToCheckout;
 
-        const originalStripe = window.Stripe;
-        window.Stripe = function(...args) {
-            const stripe = originalStripe.apply(this, args);
-            const originalRedirectToCheckout = stripe.redirectToCheckout;
-
-            stripe.redirectToCheckout = function(options) {
-                const refId = getRefId();
-                if (refId && options) {
-                    // For client-only integration
-                    if (options.lineItems) {
-                        options.clientReferenceId = options.clientReferenceId || refId;
+                stripe.redirectToCheckout = function(options) {
+                    const refId = getRefId();
+                    if (refId && options) {
+                        if (options.lineItems) {
+                            options.clientReferenceId = options.clientReferenceId || refId;
+                        }
+                        console.log('[BlackIndex] Injected ref_id into Stripe:', refId);
                     }
-                    // Log for debugging
-                    console.log('[BlackIndex] Injected ref_id into Stripe:', refId);
-                }
-                return originalRedirectToCheckout.call(this, options);
+                    return originalRedirectToCheckout.call(this, options);
+                };
+                return stripe;
             };
+            return stripeFunc;
+        }
 
-            return stripe;
-        };
+        if (typeof window.Stripe !== 'undefined' && !window.Stripe.__patched) {
+            window.Stripe = applyPatch(window.Stripe);
+            window.Stripe.__patched = true;
+        }
+
+        try {
+            Object.defineProperty(window, 'Stripe', {
+                get: function() { return _stripe; },
+                set: function(val) {
+                    if (val && !val.__patched) {
+                        _stripe = applyPatch(val);
+                        _stripe.__patched = true;
+                    } else {
+                        _stripe = val;
+                    }
+                },
+                configurable: true
+            });
+        } catch(e) {}
     }
 
     // ============================================
@@ -121,22 +140,43 @@
      * Monkey-patch Razorpay to auto-inject ref_id
      */
     function patchRazorpay() {
-        if (typeof window.Razorpay === 'undefined') return;
+        let _razorpay;
 
-        const OriginalRazorpay = window.Razorpay;
-        window.Razorpay = function(options) {
-            const refId = getRefId();
-            if (refId && options) {
-                options.notes = options.notes || {};
-                options.notes.ref_id = refId;
-                console.log('[BlackIndex] Injected ref_id into Razorpay:', refId);
-            }
-            return new OriginalRazorpay(options);
-        };
-        // Copy static methods
-        Object.keys(OriginalRazorpay).forEach(key => {
-            window.Razorpay[key] = OriginalRazorpay[key];
-        });
+        function applyPatch(OriginalRazorpay) {
+            const patched = function(options) {
+                const refId = getRefId();
+                if (refId && options) {
+                    options.notes = options.notes || {};
+                    options.notes.ref_id = refId;
+                    console.log('[BlackIndex] Injected ref_id into Razorpay:', refId);
+                }
+                return new OriginalRazorpay(options);
+            };
+            Object.keys(OriginalRazorpay).forEach(key => {
+                patched[key] = OriginalRazorpay[key];
+            });
+            return patched;
+        }
+
+        if (typeof window.Razorpay !== 'undefined' && !window.Razorpay.__patched) {
+            window.Razorpay = applyPatch(window.Razorpay);
+            window.Razorpay.__patched = true;
+        }
+
+        try {
+            Object.defineProperty(window, 'Razorpay', {
+                get: function() { return _razorpay; },
+                set: function(val) {
+                    if (val && !val.__patched) {
+                        _razorpay = applyPatch(val);
+                        _razorpay.__patched = true;
+                    } else {
+                        _razorpay = val;
+                    }
+                },
+                configurable: true
+            });
+        } catch (e) {}
     }
 
     // ============================================

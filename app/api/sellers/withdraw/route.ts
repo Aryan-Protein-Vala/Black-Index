@@ -1,16 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server'
 import { createContact, createFundAccount, createPayout } from '@/lib/razorpay'
-
-const MINIMUM_WITHDRAWAL = 100000 // ₹1,000 in paise
+import { sendEmail } from '@/lib/email'
+import { payoutSentEmail } from '@/lib/email-templates'
+import { checkRateLimit } from '@/lib/rate-limit'
+import { MINIMUM_WITHDRAWAL, WITHDRAWAL_RATE_LIMIT_PER_MIN } from '@/lib/constants'
 
 /**
  * POST /api/sellers/withdraw
- * Initiate withdrawal of cleared funds to seller's UPI
+ * Initiate withdrawal of cleared funds to the user's UPI.
+ *
+ * Fixes vs the old version:
+ * - SELL-2: no more `role === 'warlord'` gate — anyone (incl. founders who
+ *   earned commissions) can withdraw their own cleared balance
+ * - Idempotency: client sends `Idempotency-Key`; double-submit = 409
+ * - Rate limit: 1 withdrawal attempt / minute / user
+ * - The RazorpayX payout id is stored on the tx row so the payouts webhook
+ *   can auto-refund on failure
  */
 export async function POST(request: NextRequest) {
     try {
-        // Get authenticated user
         const supabase = await createServerSupabaseClient()
         const { data: { user }, error: authError } = await supabase.auth.getUser()
 
@@ -18,9 +27,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        if (!(await checkRateLimit(`withdraw:${user.id}`, WITHDRAWAL_RATE_LIMIT_PER_MIN, 60))) {
+            return NextResponse.json({ error: 'Slow down — one withdrawal per minute' }, { status: 429 })
+        }
+
         const adminClient = createAdminClient()
 
-        // Get seller profile
         const { data: profile, error: profileError } = await adminClient
             .from('profiles')
             .select('*')
@@ -40,27 +52,38 @@ export async function POST(request: NextRequest) {
             upi_vpa: string | null
         }
 
-        // Verify user is a warlord (seller)
-        if (profileData.role !== 'warlord') {
-            return NextResponse.json({ error: 'Only Warlords can withdraw' }, { status: 403 })
-        }
-
         const body = await request.json()
         const { amount, upiVpa } = body
+        const idempotencyKey = request.headers.get('idempotency-key') || body.idempotency_key || null
 
-        // Validate amount
         if (!amount || amount < MINIMUM_WITHDRAWAL) {
             return NextResponse.json({
                 error: `Minimum withdrawal is ₹${MINIMUM_WITHDRAWAL / 100}`,
             }, { status: 400 })
         }
 
-        // Check sufficient balance
         if (amount > profileData.withdrawable_balance) {
             return NextResponse.json({
                 error: 'Insufficient withdrawable balance',
                 available: profileData.withdrawable_balance,
             }, { status: 400 })
+        }
+
+        // Idempotency: this exact request already processed?
+        const wdRef = idempotencyKey ? `wd:${user.id}:${idempotencyKey}` : null
+        if (wdRef) {
+            const { data: existing } = await adminClient
+                .from('transactions')
+                .select('id, provider_payout_id, created_at')
+                .eq('external_transaction_id', wdRef)
+                .maybeSingle()
+            if (existing) {
+                return NextResponse.json({
+                    error: 'This withdrawal was already submitted',
+                    transaction_id: (existing as any).id,
+                    payout_id: (existing as any).provider_payout_id,
+                }, { status: 409 })
+            }
         }
 
         // Get or create fund account
@@ -73,18 +96,19 @@ export async function POST(request: NextRequest) {
             }, { status: 400 })
         }
 
-        // Create RazorpayX contact and fund account if not exists
+        if (!/^[a-zA-Z0-9._-]{2,}@[a-zA-Z]{2,}$/.test(vpa)) {
+            return NextResponse.json({ error: 'Invalid UPI VPA format' }, { status: 400 })
+        }
+
         if (!fundAccountId) {
-            // First create a contact
             const contact = await createContact({
-                name: profileData.full_name || 'Warlord',
+                name: profileData.full_name || 'Seller',
                 email: user.email || '',
-                contact: '', // Would need phone number
+                contact: '',
                 type: 'vendor',
                 referenceId: user.id,
             })
 
-            // Then create fund account
             const fundAccount = await createFundAccount({
                 contactId: contact.id,
                 upiVpa: vpa,
@@ -92,7 +116,6 @@ export async function POST(request: NextRequest) {
 
             fundAccountId = fundAccount.id
 
-            // Save fund account ID and UPI VPA
             await adminClient
                 .from('profiles')
                 .update({
@@ -102,22 +125,21 @@ export async function POST(request: NextRequest) {
                 .eq('id', user.id)
         }
 
-        // STEP 1: Atomically deduct balance BEFORE initiating payout
-        // This prevents double-spend if concurrent withdrawals are attempted
-        const { data: payoutResult, error: rpcError } = await adminClient.rpc('process_payout' as any, {
+        // STEP 1: Atomically deduct BEFORE payout (prevents double-spend)
+        const { error: rpcError } = await adminClient.rpc('process_payout' as never, {
             p_seller_id: user.id,
             p_amount: amount,
-        } as any)
+        } as never)
 
-        if (rpcError || payoutResult === false) {
-            // Fallback: try direct deduction with guard
+        if (rpcError) {
+            // Fallback: guarded direct deduction
             const { error: deductError } = await adminClient
                 .from('profiles')
                 .update({
                     withdrawable_balance: profileData.withdrawable_balance - amount,
                 } as never)
                 .eq('id', user.id)
-                .gte('withdrawable_balance', amount) // Guard: only deduct if still sufficient
+                .gte('withdrawable_balance', amount)
 
             if (deductError) {
                 return NextResponse.json({
@@ -136,12 +158,16 @@ export async function POST(request: NextRequest) {
                 referenceId: `withdrawal_${user.id}_${Date.now()}`,
             })
         } catch (payoutError) {
-            // Payout failed — RESTORE the balance
             console.error('Payout creation failed, restoring balance:', payoutError)
+            const { data: current } = await adminClient
+                .from('profiles')
+                .select('withdrawable_balance')
+                .eq('id', user.id)
+                .single()
             await adminClient
                 .from('profiles')
                 .update({
-                    withdrawable_balance: profileData.withdrawable_balance,
+                    withdrawable_balance: ((current as any)?.withdrawable_balance || 0) + amount,
                 } as never)
                 .eq('id', user.id)
 
@@ -150,10 +176,9 @@ export async function POST(request: NextRequest) {
             }, { status: 500 })
         }
 
-        const newBalance = profileData.withdrawable_balance - amount
-
-        // STEP 3: Create transaction record
-        await adminClient
+        // STEP 3: Transaction record (idempotent via external_transaction_id)
+        const txExternalId = wdRef || `wd:${user.id}:${payout.id}`
+        const { error: txError } = await adminClient
             .from('transactions')
             .insert({
                 type: 'payout',
@@ -162,7 +187,34 @@ export async function POST(request: NextRequest) {
                 sale_amount: amount,
                 commission_amount: amount,
                 platform_fee: 0,
+                external_transaction_id: txExternalId,
+                provider_payout_id: payout.id,
             } as never)
+
+        if (txError) {
+            // Unique violation means an idempotent retry raced us — that's fine
+            if (txError.code === '23505') {
+                return NextResponse.json({
+                    error: 'This withdrawal was already submitted',
+                }, { status: 409 })
+            }
+            console.error('Failed to record payout tx:', txError)
+        }
+
+        // STEP 4: Confirmation email (template existed; was never wired)
+        if (user.email) {
+            try {
+                await sendEmail({
+                    to: user.email,
+                    subject: `Payout initiated: ₹${(amount / 100).toLocaleString('en-IN')}`,
+                    html: payoutSentEmail(profileData.full_name || '', amount),
+                })
+            } catch (e) {
+                console.error('Payout email failed (non-fatal):', e)
+            }
+        }
+
+        const newBalance = profileData.withdrawable_balance - amount
 
         return NextResponse.json({
             success: true,
@@ -170,7 +222,7 @@ export async function POST(request: NextRequest) {
             amount,
             status: payout.status,
             newBalance,
-            message: 'Withdrawal initiated successfully',
+            message: 'Withdrawal initiated successfully. If it fails, your balance is restored automatically.',
         })
 
     } catch (error) {
@@ -182,8 +234,7 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET /api/sellers/withdraw
- * Get withdrawal eligibility and balance info
+ * GET /api/sellers/withdraw — eligibility + balance info
  */
 export async function GET() {
     try {

@@ -35,10 +35,9 @@ export async function POST(request: NextRequest) {
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
         .digest('hex')
 
-    if (!crypto.timingSafeEqual(
-        Buffer.from(razorpay_signature),
-        Buffer.from(expectedSignature)
-    )) {
+    const sigA = Buffer.from(razorpay_signature)
+    const sigB = Buffer.from(expectedSignature)
+    if (sigA.length !== sigB.length || !crypto.timingSafeEqual(sigA, sigB)) {
         return NextResponse.json({ error: 'Invalid payment signature' }, { status: 401 })
     }
 
@@ -104,6 +103,28 @@ export async function POST(request: NextRequest) {
         .eq('order_id', razorpay_order_id)
         .eq('founder_id', verifiedUserId)
 
+    // Settle queued sales: sellers who earned commissions while the wallet
+    // was empty get paid now, and auto-paused products resume automatically.
+    let settled = 0
+    try {
+        const { data: settleResult } = await supabase.rpc('settle_queued_conversions' as never, {
+            p_founder_id: verifiedUserId,
+        } as never)
+        settled = ((settleResult as any)?.settled as number) || 0
+        if (settled > 0) {
+            await supabase.from('notifications').insert({
+                user_id: verifiedUserId,
+                type: 'queue_settled',
+                title: `${settled} queued seller(s) just got paid`,
+                message: 'Your wallet top-up automatically settled queued commissions and resumed paused products.',
+                metadata: { settled },
+                read: false,
+            } as never)
+        }
+    } catch (settleErr) {
+        console.error('[WALLET VERIFY] Queue settlement failed (non-fatal):', settleErr)
+    }
+
     // Get updated balance for response
     const { data: updatedProfile } = await supabase
         .from('profiles')
@@ -115,7 +136,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
         success: true,
-        message: 'Wallet credited',
+        message: settled > 0 ? `Wallet credited. ${settled} queued seller(s) paid automatically.` : 'Wallet credited',
         new_balance: newBalance,
+        queued_sales_settled: settled,
     })
 }

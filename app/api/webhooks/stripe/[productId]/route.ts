@@ -1,19 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
-import { processConversion } from '@/lib/webhook-processor'
+import { processConversion, processRefund } from '@/lib/webhook-processor'
+import { convertMinorToINRPaise } from '@/lib/fx'
 import crypto from 'crypto'
 
 /**
  * Stripe Webhook Handler
  * POST /api/webhooks/stripe/[productId]
- * 
- * Supported events:
- * - invoice.paid (SaaS subscription renewals — PRIMARY)
- * - checkout.session.completed (one-time + first subscription payment)
- * - payment_intent.succeeded (fallback for direct payments)
- * 
- * Ref tracking: Add ref_id in session/subscription metadata
+ *
+ * EVENT MODEL (this split kills the old double/triple commission):
+ * - Subscription products  → invoice.paid ONLY (fires EVERY billing cycle,
+ *   including month 1)
+ * - One-time products      → payment_intent.succeeded ONLY
+ * - customer.subscription.deleted → churn
+ * - charge.refunded        → clawback
+ *
+ * checkout.session.completed is deliberately IGNORED. It and invoice.paid
+ * fire with different ids for the same money, so processing both pays the
+ * affiliate twice and drains the founder's wallet twice as fast.
+ *
+ * Ref tracking: ref_id in subscription metadata (subs) or payment_intent /
+ * checkout session metadata (one-time).
  */
+
+function sigInvalid(a: string, b: string): boolean {
+    const bufA = Buffer.from(a)
+    const bufB = Buffer.from(b)
+    if (bufA.length !== bufB.length) return true
+    return !crypto.timingSafeEqual(bufA, bufB)
+}
 
 export async function POST(
     request: NextRequest,
@@ -27,7 +42,7 @@ export async function POST(
         const payload = JSON.parse(rawBody)
 
         // ================================================
-        // STEP 1: VERIFY STRIPE SIGNATURE (STRICT — NO FALLBACK)
+        // STEP 1: VERIFY STRIPE SIGNATURE (STRICT)
         // ================================================
         const stripeSignature = request.headers.get('stripe-signature')
 
@@ -35,7 +50,6 @@ export async function POST(
             return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 401 })
         }
 
-        // Fetch product to get webhook_secret
         const { data: product, error: productError } = await supabase
             .from('products')
             .select('webhook_secret')
@@ -63,17 +77,13 @@ export async function POST(
             return NextResponse.json({ error: 'Invalid signature format' }, { status: 401 })
         }
 
-        // Verify signature
         const signedPayload = `${timestamp}.${rawBody}`
         const expectedSignature = crypto
             .createHmac('sha256', webhookSecret)
             .update(signedPayload)
             .digest('hex')
 
-        if (!crypto.timingSafeEqual(
-            Buffer.from(signature),
-            Buffer.from(expectedSignature)
-        )) {
+        if (sigInvalid(signature, expectedSignature)) {
             return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
         }
 
@@ -86,7 +96,7 @@ export async function POST(
         // ================================================
         // STEP 2: PARSE STRIPE PAYLOAD
         // ================================================
-        const event = payload.type
+        const event: string = payload.type
         const data = payload.data?.object
 
         if (!data) {
@@ -96,41 +106,47 @@ export async function POST(
         let refId: string | undefined
         let externalCustomerId: string
         let externalTransactionId: string
-        let amount: number
+        let amountMinor: number
+        let currency: string
         let customerEmail: string
 
         if (event === 'invoice.paid') {
             // =============================================
-            // SaaS SUBSCRIPTION RENEWAL (PRIMARY EVENT)
-            // This fires on EVERY successful invoice payment,
-            // including the first one for a new subscription.
+            // SUBSCRIPTION (PRIMARY — every billing cycle incl. first)
             // =============================================
             refId = data.subscription_details?.metadata?.ref_id
                 || data.lines?.data?.[0]?.metadata?.ref_id
                 || data.metadata?.ref_id
             externalCustomerId = data.customer
-            externalTransactionId = data.id // Invoice ID is unique per billing cycle
-            amount = data.amount_paid // in smallest currency unit
+            externalTransactionId = data.id // invoice id: unique per billing cycle
+            amountMinor = data.amount_paid
+            currency = data.currency || 'inr'
             customerEmail = data.customer_email || ''
 
-        } else if (event === 'checkout.session.completed') {
-            // One-time purchase or first subscription checkout
-            refId = data.metadata?.ref_id || data.metadata?.refId
-            externalCustomerId = data.customer || data.customer_email || data.id
-            externalTransactionId = data.payment_intent || data.id
-            amount = data.amount_total
-            customerEmail = data.customer_email || data.customer_details?.email || ''
-
         } else if (event === 'payment_intent.succeeded') {
-            // Direct payment (fallback)
+            // =============================================
+            // ONE-TIME PAYMENT ONLY
+            // subscription charges ALSO fire this, but they carry an
+            // `invoice` field — we ignore those (invoice.paid handles them)
+            // =============================================
+            if (data.invoice) {
+                return NextResponse.json({ message: 'Subscription payment — handled by invoice.paid', status: 'skipped' })
+            }
             refId = data.metadata?.ref_id || data.metadata?.refId
             externalCustomerId = data.customer || data.receipt_email || data.id
             externalTransactionId = data.id
-            amount = data.amount
+            amountMinor = data.amount
+            currency = data.currency || 'inr'
             customerEmail = data.receipt_email || ''
 
+        } else if (event === 'checkout.session.completed') {
+            // =============================================
+            // DELIBERATELY IGNORED (see header) — processing this
+            // alongside invoice.paid double-pays affiliates.
+            // =============================================
+            return NextResponse.json({ message: 'checkout.session.completed ignored by design', status: 'skipped' })
+
         } else if (event === 'customer.subscription.deleted') {
-            // Subscription cancelled — update customer status
             const customerId = data.customer
             if (customerId) {
                 await supabase
@@ -141,40 +157,58 @@ export async function POST(
             }
             return NextResponse.json({ message: 'Subscription cancellation recorded', status: 'processed' })
 
-        } else {
-            return NextResponse.json({
-                message: `Event ${event} ignored`,
-                status: 'skipped'
+        } else if (event === 'charge.refunded') {
+            // Clawback: charge carries payment_intent and/or invoice linkage
+            const refundFx = convertMinorToINRPaise(data.amount_refunded || 0, data.currency)
+            const result = await processRefund({
+                productId,
+                externalTransactionIdCandidates: [data.payment_intent, data.invoice].filter(Boolean),
+                refundExternalId: `rf_${data.id}`,
+                amount: refundFx.amountInPaise,
+                provider: 'stripe',
+                rawPayload: payload,
             })
+            return NextResponse.json({ status: result.success ? 'success' : 'error', message: result.message })
+
+        } else {
+            return NextResponse.json({ message: `Event ${event} ignored`, status: 'skipped' })
         }
 
         if (!refId) {
-            return NextResponse.json({
-                error: 'Missing ref_id in metadata',
-                hint: 'Add ref_id in session/subscription metadata'
-            }, { status: 400 })
+            console.warn(`[STRIPE WEBHOOK] Missing ref_id for product ${productId}. Event: ${event}`)
+            await supabase.from('webhook_logs').insert({
+                product_id: productId,
+                event_type: event,
+                payload,
+                status: 'skipped',
+                error_message: 'Missing ref_id — organic sale or metadata not wired',
+                ip_address: request.headers.get('x-forwarded-for') || 'stripe-webhook',
+            } as never)
+            // 200, not 400: Stripe retries non-2xx
+            return NextResponse.json({ status: 'skipped_no_ref', message: 'No ref_id — organic sale ignored' })
         }
 
         // ================================================
-        // STEP 3: PROCESS CONVERSION
+        // STEP 3: PROCESS CONVERSION (FX: cents → paise)
         // ================================================
+        const fx = convertMinorToINRPaise(amountMinor, currency)
+
         const result = await processConversion({
             productId,
             refId,
             externalCustomerId,
             externalTransactionId,
-            amount,
+            amount: fx.amountInPaise,
             customerEmail,
             provider: 'stripe',
             rawPayload: payload,
+            currency: fx.currency,
+            amountMinor,
+            fxRate: fx.fxRate,
         })
 
         if (!result.success) {
-            return NextResponse.json({
-                status: 'error',
-                message: result.message,
-                error: result.error,
-            })
+            return NextResponse.json({ status: 'error', message: result.message, error: result.error })
         }
 
         return NextResponse.json({

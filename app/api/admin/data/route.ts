@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server'
 import { createClient } from '@supabase/supabase-js'
-
-// Admin emails that can access this endpoint
-const ADMIN_EMAILS = [
-    "aryansharma24112003@gmail.com"
-]
+import { isAdminEmail } from '@/lib/admin'
 
 export async function GET(request: NextRequest) {
     try {
@@ -17,27 +13,27 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        if (!user.email || !ADMIN_EMAILS.includes(user.email)) {
+        if (!isAdminEmail(user.email)) {
             return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
         }
 
         // Use admin client to bypass RLS and get all data
         const adminClient = createAdminClient()
 
-        // Fetch all products
+        // Fetch all products — NEVER expose signing secrets to any client, admin included
         const { data: products, error: productsError } = await adminClient
             .from('products')
-            .select('*')
+            .select('id, founder_id, name, description, logo_url, website_url, is_active, is_featured, is_founders_choice, featured_until, commission_config, max_cac_limit, category, price_inr, billing_type, verified_at, script_detected_at, auto_paused, settlement_mode, created_at')
             .order('created_at', { ascending: false })
 
         if (productsError) {
             console.error('Failed to fetch products:', productsError)
         }
 
-        // Fetch all profiles
+        // Fetch all profiles — mask payout identity + connected accounts; keep ops-relevant balances
         const { data: profiles, error: profilesError } = await adminClient
             .from('profiles')
-            .select('*')
+            .select('id, role, username, full_name, avatar_url, pending_balance, withdrawable_balance, total_earnings, wallet_balance, security_deposit_paid, created_at')
             .order('created_at', { ascending: false })
 
         if (profilesError) {

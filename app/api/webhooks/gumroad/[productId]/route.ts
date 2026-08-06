@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { processConversion } from '@/lib/webhook-processor'
+import { convertMinorToINRPaise } from '@/lib/fx'
 
 /**
  * Gumroad Native Webhook Handler
@@ -102,15 +103,22 @@ export async function POST(
         }
 
         if (!refId) {
-            return NextResponse.json({
-                error: 'Missing ref_id',
-                hint: 'Add ?ref_id=xxx to your Gumroad product links'
-            }, { status: 400 })
+            console.warn(`[GUMROAD WEBHOOK] Missing ref_id for product ${productId}`)
+            await supabase.from('webhook_logs').insert({
+                product_id: productId,
+                event_type: 'sale',
+                payload,
+                status: 'skipped',
+                error_message: 'Missing ref_id — organic sale ignored',
+                ip_address: request.headers.get('x-forwarded-for') || 'gumroad-webhook',
+            } as never)
+            // 200, not 400: Gumroad retries non-2xx
+            return NextResponse.json({ status: 'skipped_no_ref', message: 'No ref_id — organic sale ignored' })
         }
 
-        // Convert price from cents to paise (assuming INR, multiply by 0.83 approx)
-        // For simplicity, we'll treat cents as paise (1:1) - founder can adjust commission
-        const amountInPaise = parseInt(price || '0', 10) * 100 // Gumroad sends in dollars, convert to cents then paise
+        // Gumroad ping `price` is in cents (USD by default). FX-convert at the edge.
+        const amountMinor = parseInt(payload.price || '0', 10)
+        const fx = convertMinorToINRPaise(amountMinor, payload.currency || 'USD')
 
         // ================================================
         // STEP 3: PROCESS CONVERSION
@@ -120,10 +128,13 @@ export async function POST(
             refId,
             externalCustomerId: email || sale_id,
             externalTransactionId: sale_id,
-            amount: amountInPaise,
+            amount: fx.amountInPaise,
             customerEmail: email || '',
             provider: 'gumroad',
             rawPayload: payload,
+            currency: fx.currency,
+            amountMinor,
+            fxRate: fx.fxRate,
         })
 
         if (!result.success) {

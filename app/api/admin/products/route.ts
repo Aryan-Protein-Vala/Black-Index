@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase-server'
-
-// Admin emails - only these users can access admin API
-const ADMIN_EMAILS = [
-    "aryansharma24112003@gmail.com"
-]
+import { isAdminEmail } from '@/lib/admin'
 
 /**
  * POST /api/admin/products
@@ -16,7 +12,7 @@ export async function POST(request: NextRequest) {
         const authClient = await createServerSupabaseClient()
         const { data: { user } } = await authClient.auth.getUser()
 
-        if (!user || !ADMIN_EMAILS.includes(user.email || '')) {
+        if (!user || !isAdminEmail(user.email)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 

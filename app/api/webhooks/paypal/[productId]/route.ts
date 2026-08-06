@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { processConversion } from '@/lib/webhook-processor'
+import { convertMinorToINRPaise } from '@/lib/fx'
 
 /**
  * PayPal Native Webhook Handler
@@ -51,7 +52,10 @@ export async function POST(
         // ================================================
         const eventType = payload.event_type
 
-        if (eventType !== 'PAYMENT.CAPTURE.COMPLETED') {
+        // Accept BOTH event names — the onboarding docs told founders to enable
+        // PAYMENT.SALE.COMPLETED while the code only handled CAPTURE.COMPLETED,
+        // which silently dropped 100% of PayPal sales.
+        if (eventType !== 'PAYMENT.CAPTURE.COMPLETED' && eventType !== 'PAYMENT.SALE.COMPLETED') {
             return NextResponse.json({
                 message: `Event ${eventType} ignored`,
                 status: 'skipped'
@@ -67,15 +71,24 @@ export async function POST(
         const refId = resource.custom_id
 
         if (!refId) {
-            return NextResponse.json({
-                error: 'Missing ref_id in custom_id',
-                hint: 'Pass ref_id in custom_id when creating PayPal order'
-            }, { status: 400 })
+            console.warn(`[PAYPAL WEBHOOK] Missing ref_id for product ${productId}`)
+            await supabase.from('webhook_logs').insert({
+                product_id: productId,
+                event_type: eventType,
+                payload,
+                status: 'skipped',
+                error_message: 'Missing ref_id in custom_id — organic sale ignored',
+                ip_address: request.headers.get('x-forwarded-for') || 'paypal-webhook',
+            } as never)
+            // 200, not 400: PayPal retries non-2xx
+            return NextResponse.json({ status: 'skipped_no_ref', message: 'No ref_id — organic sale ignored' })
         }
 
-        // PayPal amounts are in currency units (e.g., "10.00" for $10)
+        // PayPal amounts are in currency units (e.g., "10.00" for $10) + currency code
         const amountValue = parseFloat(resource.amount?.value || '0')
-        const amountInPaise = Math.floor(amountValue * 100) // Convert to smallest unit
+        const amountMinor = Math.round(amountValue * 100) // → minor units (cents)
+        const fx = convertMinorToINRPaise(amountMinor, resource.amount?.currency_code)
+        const amountInPaise = fx.amountInPaise
 
         // Get payer email
         const payerEmail = payload.resource?.payer?.email_address || ''
@@ -92,6 +105,9 @@ export async function POST(
             customerEmail: payerEmail,
             provider: 'paypal',
             rawPayload: payload,
+            currency: fx.currency,
+            amountMinor,
+            fxRate: fx.fxRate,
         })
 
         if (!result.success) {

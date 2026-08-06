@@ -2,38 +2,38 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { sendEmail } from '@/lib/email'
 import { walletLowEmail } from '@/lib/email-templates'
+import { LOW_BALANCE_WARN, PAUSE_BALANCE_THRESHOLD } from '@/lib/constants'
 
 /**
- * Wallet Check Cron Job
- * GET /api/cron/wallet-check
- * 
- * Runs daily to auto-pause products for Tier 2 founders with empty wallets.
- * 
- * Vercel Cron: Every day at 2 AM IST
- * cron: "30 20 * * *" (20:30 UTC = 2:00 IST)
+ * Wallet Health Cron
+ * GET /api/cron/wallet-check — daily
+ *
+ * Wallet-only billing model: founders pre-fund commissions.
+ *
+ * TWO thresholds (the old version only acted at exactly ₹0, leaving a
+ * dead zone where products stayed listed but sellers silently earned ₹0):
+ *
+ * 1. balance < LOW_BALANCE_WARN (₹2,000)  → warning email + notification (1/day digest)
+ * 2. balance < PAUSE_BALANCE_THRESHOLD (₹500) → auto-pause products
+ *    (auto_paused=true so top-ups can safely auto-resume ONLY these)
+ *
+ * Auto-resume happens in settle_queued_conversions on every wallet top-up.
  */
-
 export async function GET(request: NextRequest) {
-    // Verify cron secret
     const authHeader = request.headers.get('authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const supabase = createAdminClient()
-
     console.log('[WALLET CHECK] Starting cron job')
 
     try {
-        // Find Tier 2 founders (no stripe_connect_id AND no razorpay_account_id)
-        // whose wallet_balance is 0
         const { data: founders, error: fetchError } = await supabase
             .from('profiles')
             .select('id, email, full_name, wallet_balance')
             .eq('role', 'founder')
-            .is('stripe_connect_id', null)
-            .is('razorpay_account_id', null)
-            .lte('wallet_balance', 0)
+            .lt('wallet_balance', LOW_BALANCE_WARN)
 
         if (fetchError) {
             console.error('[WALLET CHECK] Failed to fetch founders:', fetchError)
@@ -41,65 +41,84 @@ export async function GET(request: NextRequest) {
         }
 
         if (!founders || founders.length === 0) {
-            console.log('[WALLET CHECK] No founders with empty wallets')
-            return NextResponse.json({ message: 'No action needed', paused: 0 })
+            return NextResponse.json({ message: 'All wallets healthy', warned: 0, paused: 0 })
         }
 
+        let warnedFounders = 0
+        let pausedFounders = 0
         let pausedProducts = 0
-        let notifiedFounders = 0
 
-        for (const founder of founders) {
-            const typedFounder = founder as { id: string; email: string; full_name: string; wallet_balance: number }
+        for (const raw of founders) {
+            const founder = raw as { id: string; email: string; full_name: string; wallet_balance: number }
+            const shouldPause = founder.wallet_balance < PAUSE_BALANCE_THRESHOLD
+            const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-            // Pause all active products for this founder
-            const { data: updatedProducts, error: updateError } = await supabase
-                .from('products')
-                .update({ is_active: false } as never)
-                .eq('founder_id', typedFounder.id)
-                .eq('is_active', true)
-                .select('id')
+            if (shouldPause) {
+                // Pause active products, tag as auto_paused (top-ups auto-resume these only)
+                const { data: updatedProducts } = await supabase
+                    .from('products')
+                    .update({ is_active: false, auto_paused: true } as never)
+                    .eq('founder_id', founder.id)
+                    .eq('is_active', true)
+                    .select('id')
 
-            if (!updateError && updatedProducts) {
-                pausedProducts += updatedProducts.length
+                const count = updatedProducts?.length || 0
+                if (count > 0) {
+                    pausedFounders++
+                    pausedProducts += count
 
-                if (updatedProducts.length > 0) {
-                    console.log(`[WALLET CHECK] Paused ${updatedProducts.length} products for founder ${typedFounder.id}`)
-
-                    // Notify founder
                     await supabase.from('notifications').insert({
-                        user_id: typedFounder.id,
+                        user_id: founder.id,
                         type: 'wallet_empty',
                         title: 'Products Paused — Wallet Empty',
-                        message: `Your commission wallet is empty. ${updatedProducts.length} product(s) have been paused. Deposit funds to reactivate.`,
-                        metadata: { paused_products: updatedProducts.length },
+                        message: `Your commission wallet balance (₹${(founder.wallet_balance / 100).toLocaleString('en-IN')}) is too low. ${count} product(s) paused. Top up — they'll resume automatically and queued sellers get paid.`,
+                        metadata: { paused_products: count, wallet_balance: founder.wallet_balance },
+                        read: false,
+                    } as never)
+                }
+            } else {
+                // Low-balance warning, digest-limited to 1/day
+                const { count: recentWarn } = await supabase
+                    .from('notifications')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', founder.id)
+                    .eq('type', 'wallet_low')
+                    .gte('created_at', dayAgo)
+
+                if (!recentWarn || recentWarn === 0) {
+                    await supabase.from('notifications').insert({
+                        user_id: founder.id,
+                        type: 'wallet_low',
+                        title: 'Wallet running low',
+                        message: `Your commission wallet has ₹${(founder.wallet_balance / 100).toLocaleString('en-IN')} left. If it empties, products pause and sellers stop earning.`,
+                        metadata: { wallet_balance: founder.wallet_balance },
                         read: false,
                     } as never)
 
-                    // Send email
-                    if (typedFounder.email) {
+                    if (founder.email) {
                         try {
                             await sendEmail({
-                                to: typedFounder.email,
-                                subject: 'Products Paused — Wallet Empty',
-                                html: walletLowEmail(typedFounder.full_name, typedFounder.wallet_balance),
+                                to: founder.email,
+                                subject: 'Your BlackIndex wallet is running low',
+                                html: walletLowEmail(founder.full_name, founder.wallet_balance),
                             })
-                            notifiedFounders++
                         } catch (emailErr) {
-                            console.error('[WALLET CHECK] Email failed for', typedFounder.id, emailErr)
+                            console.error('[WALLET CHECK] Email failed for', founder.id, emailErr)
                         }
                     }
+                    warnedFounders++
                 }
             }
         }
 
-        console.log('[WALLET CHECK] Completed:', { pausedProducts, notifiedFounders })
+        console.log('[WALLET CHECK] Completed:', { warnedFounders, pausedFounders, pausedProducts })
 
         return NextResponse.json({
             success: true,
-            message: 'Wallet check completed',
             founders_checked: founders.length,
+            warned: warnedFounders,
+            paused_founders: pausedFounders,
             products_paused: pausedProducts,
-            founders_notified: notifiedFounders,
         })
 
     } catch (error) {

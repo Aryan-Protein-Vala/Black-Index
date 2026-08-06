@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
+import { convertMinorToINRPaise } from '@/lib/fx'
 import crypto from 'crypto'
 
 /**
@@ -83,9 +84,9 @@ export async function POST(request: NextRequest) {
             console.log(`[LS WEBHOOK] Security deposit marked paid for ${userId}`)
 
         } else if (type === 'wallet_topup') {
-            // Convert USD cents to INR paise (approx ×84 for internal consistency)
-            const USD_TO_INR_RATE = 84
-            const amountInPaise = totalCents * USD_TO_INR_RATE
+            // FX from env (no more hardcoded ×84)
+            const fx = convertMinorToINRPaise(totalCents, payload?.data?.attributes?.currency || 'USD')
+            const amountInPaise = fx.amountInPaise
 
             // Try atomic RPC first, fallback to read-then-write
             const { error: rpcError } = await supabase.rpc('credit_wallet' as any, {
@@ -116,6 +117,26 @@ export async function POST(request: NextRequest) {
             }
 
             console.log(`[LS WEBHOOK] Wallet credited +${amountInPaise} paise for ${userId}`)
+
+            // Settle queued sales (sellers earned while wallet was empty) + auto-resume products
+            try {
+                const { data: settleResult } = await supabase.rpc('settle_queued_conversions' as never, {
+                    p_founder_id: userId,
+                } as never)
+                const settled = ((settleResult as any)?.settled as number) || 0
+                if (settled > 0) {
+                    await supabase.from('notifications').insert({
+                        user_id: userId,
+                        type: 'queue_settled',
+                        title: `${settled} queued seller(s) just got paid`,
+                        message: 'Your wallet top-up automatically settled queued commissions and resumed paused products.',
+                        metadata: { settled },
+                        read: false,
+                    } as never)
+                }
+            } catch (settleErr) {
+                console.error('[LS WEBHOOK] Queue settlement failed (non-fatal):', settleErr)
+            }
         }
 
         // ── Record completed deposit ──

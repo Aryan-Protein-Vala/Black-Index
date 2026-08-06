@@ -76,9 +76,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             websiteUrl = 'https://' + websiteUrl
         }
 
-        // 2. Signal Log - Increment clicks (fire-and-forget, don't block redirect)
-        const newClicks = (link.clicks || 0) + 1
-        supabase.from('links').update({ clicks: newClicks } as any).eq('id', link.id).then(() => { }).catch(() => { })
+        // 2. Signal Log - Increment clicks atomically (was read-modify-write:
+        // parallel clicks overwrote each other and undercounted)
+        Promise.resolve(supabase.rpc('increment_clicks' as never, { p_link_id: link.id } as never)).then(() => { }, () => { })
 
         // 3. Payload Attachment - Construct destination URL with ref_id
         try {

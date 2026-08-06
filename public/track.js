@@ -230,6 +230,33 @@
     // INITIALIZATION
     // ============================================
 
+    function getProductId() {
+        try {
+            var scripts = document.querySelectorAll('script[data-product]');
+            for (var i = 0; i < scripts.length; i++) {
+                var src = scripts[i].getAttribute('src') || '';
+                if (src.indexOf('track.js') !== -1) {
+                    return scripts[i].getAttribute('data-product');
+                }
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    function sendBeacon() {
+        // One-time diagnostic ping: lets the founder know their install works
+        // (dashboard install-status flips "script detected") — no PII, no PII storage.
+        try {
+            var pid = getProductId();
+            if (!pid) return;
+            var key = 'bi_beacon_' + pid;
+            if (localStorage.getItem(key)) return;
+            localStorage.setItem(key, '1');
+            var base = window.location.protocol + '//blackindex.in';
+            fetch(base + '/api/install/ping?product=' + encodeURIComponent(pid), { mode: 'cors', credentials: 'omit' }).catch(function() {});
+        } catch (e) {}
+    }
+
     function init() {
         // Capture ref from URL immediately
         const refId = getRefId();
@@ -238,6 +265,8 @@
         if (refId) {
             console.log('[BlackIndex] Tracking ref_id:', refId);
         }
+
+        sendBeacon();
 
         // Wait for DOM ready
         if (document.readyState === 'loading') {

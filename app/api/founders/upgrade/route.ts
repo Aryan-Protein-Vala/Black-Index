@@ -36,6 +36,29 @@ export async function POST() {
 
         const amount = 10000 // ₹100 in paise (discounted from 500)
 
+        // Check for existing recent order
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+        const { data: existingPayment } = await adminClient
+            .from('payments')
+            .select('order_id, amount')
+            .eq('user_id', user.id)
+            .eq('payment_type', 'founder_upgrade')
+            .eq('status', 'created')
+            .gte('created_at', oneHourAgo)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (existingPayment) {
+            return NextResponse.json({
+                orderId: existingPayment.order_id,
+                amount: existingPayment.amount,
+                email: user.email,
+                name: profileData?.full_name,
+                phone: null,
+            })
+        }
+
         // Create Razorpay order
         const orderResponse = await fetch('https://api.razorpay.com/v1/orders', {
             method: 'POST',
@@ -85,6 +108,7 @@ export async function POST() {
             amount: order.amount,
             email: user.email,
             name: profileData?.full_name,
+            phone: null,
         })
 
     } catch (error) {

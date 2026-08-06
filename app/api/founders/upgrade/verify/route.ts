@@ -13,6 +13,7 @@ const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET!
 export async function POST(request: NextRequest) {
     const adminClient = createAdminClient()
     let razorpay_order_id: string | undefined
+    let current_user_id: string | undefined
 
     try {
         const supabase = await createServerSupabaseClient()
@@ -21,6 +22,7 @@ export async function POST(request: NextRequest) {
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
+        current_user_id = user.id
 
         const body = await request.json()
         razorpay_order_id = body.razorpay_order_id
@@ -30,13 +32,36 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Missing payment details' }, { status: 400 })
         }
 
+        const { data: existingPayment, error: existingError } = await adminClient
+            .from('payments')
+            .select('status')
+            .eq('order_id', razorpay_order_id)
+            .eq('user_id', user.id)
+            .maybeSingle()
+
+        if (existingError || !existingPayment) {
+            return NextResponse.json({ error: 'Unknown order' }, { status: 404 })
+        }
+
+        if ((existingPayment as { status: string }).status === 'succeeded') {
+            // Already processed - return success without re-granting access
+            return NextResponse.json({
+                success: true,
+                message: 'Payment already processed',
+            })
+        }
+
         // Verify signature using HMAC SHA256
         const expectedSignature = crypto
             .createHmac('sha256', RAZORPAY_KEY_SECRET)
             .update(`${razorpay_order_id}|${razorpay_payment_id}`)
             .digest('hex')
 
-        if (expectedSignature !== razorpay_signature) {
+        const expectedBuffer = Buffer.from(expectedSignature)
+        const actualBuffer = typeof razorpay_signature === 'string' ? Buffer.from(razorpay_signature) : Buffer.from('')
+        const isValid = expectedBuffer.length === actualBuffer.length && crypto.timingSafeEqual(expectedBuffer, actualBuffer)
+
+        if (!isValid) {
             // Log failure
             await adminClient
                 .from('payments')
@@ -45,23 +70,9 @@ export async function POST(request: NextRequest) {
                     failure_reason: 'Invalid signature',
                 } as never)
                 .eq('order_id', razorpay_order_id)
+                .eq('user_id', user.id)
 
             return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
-        }
-
-        // IDEMPOTENCY: Check if already succeeded (prevent double-processing)
-        const { data: existingPayment } = await adminClient
-            .from('payments')
-            .select('status')
-            .eq('order_id', razorpay_order_id)
-            .single()
-
-        if ((existingPayment as { status: string } | null)?.status === 'succeeded') {
-            // Already processed - return success without re-granting access
-            return NextResponse.json({
-                success: true,
-                message: 'Payment already processed',
-            })
         }
 
         // Update payment status to succeeded FIRST (before granting access)
@@ -73,6 +84,7 @@ export async function POST(request: NextRequest) {
                 source: 'checkout',
             } as never)
             .eq('order_id', razorpay_order_id)
+            .eq('user_id', user.id)
 
         if (paymentUpdateError) {
             console.error('Failed to update payment:', paymentUpdateError)
@@ -95,6 +107,7 @@ export async function POST(request: NextRequest) {
                     metadata: { upgrade_failed: true, error: updateError.message },
                 } as never)
                 .eq('order_id', razorpay_order_id)
+                .eq('user_id', user.id)
 
             return NextResponse.json({ error: 'Failed to upgrade' }, { status: 500 })
         }
@@ -108,7 +121,7 @@ export async function POST(request: NextRequest) {
         console.error('Verify payment error:', error)
 
         // Try to log failure
-        if (razorpay_order_id) {
+        if (razorpay_order_id && current_user_id) {
             await adminClient
                 .from('payments')
                 .update({
@@ -116,6 +129,7 @@ export async function POST(request: NextRequest) {
                     failure_reason: error instanceof Error ? error.message : 'Unknown error',
                 } as never)
                 .eq('order_id', razorpay_order_id)
+                .eq('user_id', current_user_id)
         }
 
         return NextResponse.json({

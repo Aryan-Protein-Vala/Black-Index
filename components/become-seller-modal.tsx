@@ -59,7 +59,7 @@ export function BecomeSellerModal({ isOpen, onClose, onSuccess }: BecomeSellerMo
                 amount: SELLER_PRICING.price * 100, // In paise
                 currency: "INR",
                 name: "Black Index",
-                description: "Become a Seller - Onboarding Fee",
+                description: "Become a Seller - Monthly Subscription",
                 order_id: data.orderId,
                 handler: async function (response: any) {
                     // Verify payment
@@ -151,11 +151,12 @@ export function BecomeSellerModal({ isOpen, onClose, onSuccess }: BecomeSellerMo
                                 <div className="inline-flex items-baseline gap-2">
                                     <span className="text-2xl text-muted-foreground line-through decoration-red-500/50">₹500</span>
                                     <span className="text-4xl font-light text-green-400">₹{SELLER_PRICING.price}</span>
+                                    <span className="text-muted-foreground text-sm">/month</span>
                                 </div>
                                 <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 text-xs font-medium">
                                     🎉 Launch Special Discount
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-3">One-time onboarding fee</p>
+                                <p className="text-xs text-muted-foreground mt-3">Cancel anytime</p>
                             </div>
 
                             {/* Features */}

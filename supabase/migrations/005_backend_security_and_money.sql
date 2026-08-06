@@ -8,6 +8,63 @@
 create extension if not exists pgcrypto;
 
 -- ============================================================
+-- DEFENSIVE PREAMBLE — make prod whole FIRST.
+-- INF-8: we don't know which legacy SQL files actually ran on
+-- prod. Every table/column this migration (and the new code)
+-- depends on is created/added idempotently here, BEFORE
+-- anything references it.
+-- ============================================================
+
+-- customers (additional-schema.sql — may never have run)
+create table if not exists public.customers (
+  id uuid default gen_random_uuid() primary key,
+  product_id uuid references public.products(id) on delete cascade not null,
+  seller_id uuid references public.profiles(id) on delete cascade not null,
+  external_customer_id text not null,
+  first_seen_at timestamp with time zone default timezone('utc', now()),
+  unique (product_id, external_customer_id)
+);
+alter table public.customers enable row level security;
+alter table public.customers add column if not exists status text default 'active';
+alter table public.customers add column if not exists billing_count int default 0;
+
+-- profiles money/identity columns (003/004/advanced_billing)
+alter table public.profiles add column if not exists wallet_balance bigint default 0;
+alter table public.profiles add column if not exists security_deposit_paid boolean default false;
+alter table public.profiles add column if not exists stripe_connect_id text;
+alter table public.profiles add column if not exists razorpay_account_id text;
+alter table public.profiles add column if not exists razorpay_fund_account_id text;
+alter table public.profiles add column if not exists upi_vpa text;
+alter table public.profiles add column if not exists email text;
+alter table public.profiles add column if not exists phone text;
+
+-- transactions lifecycle columns (004/advanced_billing)
+alter table public.transactions add column if not exists is_recurring boolean default false;
+alter table public.transactions add column if not exists billing_status text default 'unbilled';
+
+-- LANDMINE DEFUSED: advanced_billing.sql created a CHECK on
+-- billing_status allowing only ('unbilled','scheduled','billed').
+-- 'wallet_insufficient' violates it → every sale with an empty
+-- wallet would throw and be LOST. Drop ANY check on that column.
+do $$
+declare c record;
+begin
+  for c in
+    select con.conname
+      from pg_constraint con
+      join pg_class rel on rel.oid = con.conrelid
+      join pg_namespace nsp on nsp.oid = rel.relnamespace
+      join pg_attribute att on att.attrelid = rel.oid and att.attnum = any(con.conkey)
+     where nsp.nspname = 'public'
+       and rel.relname = 'transactions'
+       and con.contype = 'c'
+       and att.attname = 'billing_status'
+  loop
+    execute format('alter table public.transactions drop constraint if exists %I', c.conname);
+  end loop;
+end $$;
+
+-- ============================================================
 -- 0.1 SEC-1: PROFILES COLUMN LOCKDOWN
 -- Browser sessions may only update display/payout-identity columns.
 -- Money, role, deposit, and connected-account columns are service-role only.
@@ -105,11 +162,58 @@ create policy "Founders can insert own products" on public.products
   );
 
 -- ============================================================
--- 0.3 SEC-3: Balance RPCs are service-role only
+-- 0.3 SEC-3: Balance RPCs — re-create idempotently THEN lock down.
+-- (Re-creating also repairs prod if additional-schema.sql never
+-- ran; bare REVOKEs on missing functions would abort the migration.)
 -- ============================================================
-revoke execute on function lock_commission_funds(uuid, bigint) from anon, authenticated;
-revoke execute on function release_cleared_funds(uuid, bigint) from anon, authenticated;
-revoke execute on function process_payout(uuid, bigint) from anon, authenticated;
+create or replace function public.lock_commission_funds(p_seller_id uuid, p_amount bigint)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.profiles
+  set pending_balance = coalesce(pending_balance, 0) + p_amount,
+      total_earnings = coalesce(total_earnings, 0) + p_amount,
+      updated_at = timezone('utc', now())
+  where id = p_seller_id;
+end $$;
+
+create or replace function public.release_cleared_funds(p_seller_id uuid, p_amount bigint)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.profiles
+  set pending_balance = pending_balance - p_amount,
+      withdrawable_balance = coalesce(withdrawable_balance, 0) + p_amount,
+      updated_at = timezone('utc', now())
+  where id = p_seller_id
+    and pending_balance >= p_amount;
+end $$;
+
+create or replace function public.process_payout(p_seller_id uuid, p_amount bigint)
+returns boolean
+language plpgsql security definer set search_path = public as $$
+declare
+  current_balance bigint;
+begin
+  select withdrawable_balance into current_balance
+    from public.profiles where id = p_seller_id for update;
+
+  if current_balance is not null and current_balance >= p_amount then
+    update public.profiles
+    set withdrawable_balance = withdrawable_balance - p_amount,
+        updated_at = timezone('utc', now())
+    where id = p_seller_id;
+    return true;
+  end if;
+  return false;
+end $$;
+
+revoke all on function public.lock_commission_funds(uuid, bigint) from public, anon, authenticated;
+revoke all on function public.release_cleared_funds(uuid, bigint) from public, anon, authenticated;
+revoke all on function public.process_payout(uuid, bigint) from public, anon, authenticated;
+grant execute on function public.lock_commission_funds(uuid, bigint) to service_role;
+grant execute on function public.release_cleared_funds(uuid, bigint) to service_role;
+grant execute on function public.process_payout(uuid, bigint) to service_role;
 
 -- ============================================================
 -- 0.4 SEC-4: charges table — strip every policy (service-role only by default under RLS)
@@ -259,7 +363,11 @@ grant execute on function public.check_rate_limit(text, int, int) to service_rol
 
 -- ============================================================
 -- increment_clicks (atomic; ref route uses it instead of read-modify-write)
+-- NOTE: advanced_billing.sql may have created this with a different
+-- parameter name (link_id) — DROP first (CREATE OR REPLACE cannot
+-- rename parameters), then recreate.
 -- ============================================================
+drop function if exists public.increment_clicks(uuid);
 create or replace function public.increment_clicks(p_link_id uuid)
 returns void
 language sql

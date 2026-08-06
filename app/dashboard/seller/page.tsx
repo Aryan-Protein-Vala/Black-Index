@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
     LayoutDashboard, Link2, Vault, TrendingUp, Settings,
     Copy, Check, ArrowUpRight, LogOut, Package, Plus, Loader2,
-    ExternalLink, Crown, Flag, AlertCircle
+    ExternalLink, Crown, Flag, AlertCircle, Wallet
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,12 +17,15 @@ import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 import { useProducts, useLinks, useDashboardStats, formatCurrency, useTransactions } from "@/hooks/use-dashboard-data"
 import { BecomeSellerModal } from "@/components/become-seller-modal"
-import { PayoutPopover } from "@/components/seller/payout-popover"
+import { WithdrawFunds } from "@/components/seller/withdraw-funds"
+import { SellerWalletBalance } from "@/components/seller/seller-wallet-balance"
+import { NotificationsBell } from "@/components/notifications-bell"
 import { ProductTour } from "@/components/product-tour"
 
 // Tab configuration
 const sidebarItems = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
+    { id: "payouts", label: "Payouts", icon: Wallet },
     { id: "links", label: "My Links", icon: Link2 },
     { id: "vault", label: "The Vault", icon: Vault },
     { id: "analytics", label: "Analytics", icon: TrendingUp },
@@ -239,11 +242,11 @@ function LinksTab({ copiedStates, handleCopy }: { copiedStates: Record<string, b
             const { data: linkData } = await supabase
                 .from('links')
                 .select('product_id, products(founder_id)')
-                .eq('id', selectedLink?.id)
+                .eq('id', selectedLink?.id || '')
                 .single()
 
-            const product_id = linkData?.product_id
-            const founder_id = (linkData?.products as any)?.founder_id
+            const product_id = (linkData as any)?.product_id
+            const founder_id = (linkData as any)?.products?.founder_id
 
             const res = await fetch("/api/fraud-reports", {
                 method: "POST",
@@ -571,8 +574,15 @@ function VaultTab({ copiedStates, handleCopy }: { copiedStates: Record<string, b
 
                                 {/* Commission - Fixed Height */}
                                 <div className="flex justify-between text-sm mb-4">
-                                    <span className="text-muted-foreground font-light">Commission</span>
-                                    <span className="font-light">{upfrontPct}%</span>
+                                    <span className="text-muted-foreground font-light">You earn</span>
+                                    <div className="text-right">
+                                        <div className="font-medium text-green-400">{(product as any).price_inr ? `₹${(((product as any).price_inr / 100) * upfrontPct / 100).toFixed(0)}/sale` : `${upfrontPct}% upfront`}</div>
+                                        {(product as any).billing_type === "subscription" && recurringPct > 0 && (
+                                            <div className="text-xs text-muted-foreground mt-0.5">
+                                                then {(product as any).price_inr ? `₹${(((product as any).price_inr / 100) * recurringPct / 100).toFixed(0)}/mo × ${config?.max_recurring_months || 0}` : `${recurringPct}%/mo × ${config?.max_recurring_months || 0}`}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Spacer to push button to bottom */}
@@ -643,12 +653,7 @@ function VaultTab({ copiedStates, handleCopy }: { copiedStates: Record<string, b
                                     </button>
                                 </div>
 
-                                {/* Tagline */}
-                                {selectedProduct.tagline && (
-                                    <p className="text-base text-foreground/80 font-light italic mb-4">
-                                        "{selectedProduct.tagline}"
-                                    </p>
-                                )}
+
 
                                 {/* Description */}
                                 {selectedProduct.description && (
@@ -662,36 +667,28 @@ function VaultTab({ copiedStates, handleCopy }: { copiedStates: Record<string, b
                                     {selectedProduct.category && (
                                         <div className="p-3 rounded-lg bg-foreground/5 border border-border/30">
                                             <p className="text-xs text-muted-foreground mb-1">Category</p>
-                                            <p className="text-sm font-light">{selectedProduct.category}</p>
+                                            <p className="text-sm font-light capitalize">{selectedProduct.category.replace("_", " ")}</p>
                                         </div>
                                     )}
-                                    {selectedProduct.pricing && (
-                                        <div className="p-3 rounded-lg bg-foreground/5 border border-border/30">
-                                            <p className="text-xs text-muted-foreground mb-1">Pricing</p>
-                                            <p className="text-sm font-light">{selectedProduct.pricing}</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Target Audience */}
-                                {selectedProduct.target_audience && (
-                                    <div className="p-3 rounded-lg bg-purple-500/5 border border-purple-500/20 mb-4">
-                                        <p className="text-xs text-purple-400 mb-1">Target Audience</p>
-                                        <p className="text-sm font-light">{selectedProduct.target_audience}</p>
+                                    <div className="p-3 rounded-lg bg-foreground/5 border border-border/30">
+                                        <p className="text-xs text-muted-foreground mb-1">Pricing</p>
+                                        <p className="text-sm font-light">{selectedProduct.price_inr ? `₹${selectedProduct.price_inr / 100}` : "Variable"} {selectedProduct.billing_type === "subscription" ? "/ month" : "one-time"}</p>
                                     </div>
-                                )}
+                                </div>
 
                                 {/* Commission Details */}
                                 <div className="space-y-3 p-4 rounded-lg bg-foreground/5 border border-border/30 mb-6">
                                     <h4 className="text-xs font-light text-muted-foreground uppercase tracking-wider mb-3">Your Commission</h4>
                                     <div className="flex justify-between">
                                         <span className="text-sm font-light">Upfront (First Sale)</span>
-                                        <span className="text-sm font-medium text-green-400">{(selectedProduct.commission_config as any)?.upfront_pct || 0}%</span>
+                                        <span className="text-sm font-medium text-green-400">{(selectedProduct.commission_config as any)?.upfront_pct || 0}% {selectedProduct.price_inr ? `(₹${(selectedProduct.price_inr / 100 * ((selectedProduct.commission_config as any)?.upfront_pct || 0) / 100).toFixed(0)})` : ""}</span>
                                     </div>
+                                    {selectedProduct.billing_type === "subscription" && ((selectedProduct.commission_config as any)?.recurring_pct > 0) && (
                                     <div className="flex justify-between">
                                         <span className="text-sm font-light">Recurring (Monthly)</span>
-                                        <span className="text-sm font-medium text-blue-400">{(selectedProduct.commission_config as any)?.recurring_pct || 0}%</span>
+                                        <span className="text-sm font-medium text-blue-400">{(selectedProduct.commission_config as any)?.recurring_pct}% {selectedProduct.price_inr ? `(₹${(selectedProduct.price_inr / 100 * ((selectedProduct.commission_config as any)?.recurring_pct || 0) / 100).toFixed(0)})` : ""} × {(selectedProduct.commission_config as any)?.max_recurring_months || 0}</span>
                                     </div>
+                                    )}
                                 </div>
 
                                 {/* Get Link Button */}
@@ -724,118 +721,42 @@ function VaultTab({ copiedStates, handleCopy }: { copiedStates: Record<string, b
 // ANALYTICS TAB (Original Style from performance-sales-network)
 // ============================================
 function AnalyticsTab({ stats, links, products }: { stats: ReturnType<typeof useDashboardStats>, links: any[], products: any[] }) {
-    const weeklyData = [
-        { week: "Week 1", earnings: 0 },
-        { week: "Week 2", earnings: 0 },
-        { week: "Week 3", earnings: 0 },
-        { week: "Week 4", earnings: stats.thisWeekEarnings / 100 },
-    ]
-
-    // Calculate metrics from real data
-    const totalClicks = links.reduce((sum, link) => sum + (link.clicks || 0), 0)
-    const conversionRate = totalClicks > 0 ? ((stats.conversions / totalClicks) * 100) : 0
-    const avgOrder = stats.conversions > 0 ? Math.round(stats.totalEarnings / stats.conversions) : 0
-
-    // For now, no historical data means 0% change
-    // In the future, compare with last week's data from transactions
-    const clickRateChange = 0
-    const conversionChange = 0
-    const avgOrderChange = 0
-    const revenueChange = 0
-
-    // Helper to format change with sign and color
-    const formatChange = (value: number, isPercent: boolean = true, isCurrency: boolean = false) => {
-        if (value === 0) return { text: "0.0%", color: "text-muted-foreground" }
-        const sign = value > 0 ? "+" : ""
-        const formatted = isCurrency
-            ? `${sign}${formatCurrency(Math.abs(value))}`
-            : `${sign}${Math.abs(value).toFixed(1)}%`
-        const color = value > 0 ? "text-green-400" : "text-red-400"
-        return { text: formatted, color }
-    }
-
-    const statsData = [
-        { label: "Click Rate", value: `${conversionRate.toFixed(1)}%`, ...formatChange(clickRateChange) },
-        { label: "Conversion", value: `${conversionRate.toFixed(1)}%`, ...formatChange(conversionChange) },
-        { label: "Avg. Order", value: formatCurrency(avgOrder), ...formatChange(avgOrderChange, false, true) },
-        { label: "Revenue", value: formatCurrency(stats.totalEarnings), ...formatChange(revenueChange) },
-    ]
+    const earned = stats.totalEarnings
+    const clicks = links.reduce((sum, link) => sum + (link.clicks || 0), 0)
+    const conversions = stats.conversions
+    const rate = clicks > 0 ? (conversions / clicks) * 100 : 0
 
     return (
         <div className="space-y-6">
-            {/* Weekly Stats - Original Style */}
+            {/* Stats Overview */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
                 className="grid grid-cols-2 lg:grid-cols-4 gap-4"
             >
-                {statsData.map((stat, i) => (
-                    <motion.div
-                        key={stat.label}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                    >
-                        <SpotlightCard className="p-4">
-                            <p className="text-[10px] font-light text-muted-foreground uppercase tracking-[0.2em] mb-2">
-                                {stat.label}
-                            </p>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-lg font-light tracking-tight">{stat.value}</span>
-                                <span className={`text-[10px] font-light ${stat.color}`}>{stat.text}</span>
-                            </div>
-                        </SpotlightCard>
-                    </motion.div>
-                ))}
-            </motion.div>
-
-            {/* Monthly Chart */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-            >
-                <SpotlightCard className="p-6">
-                    <h3 className="text-xs font-light text-muted-foreground uppercase tracking-[0.2em] mb-6">
-                        Monthly Performance
-                    </h3>
-                    <div className="h-48 sm:h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={weeklyData}>
-                                <defs>
-                                    <linearGradient id="weeklyGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#ffffff" stopOpacity={0.15} />
-                                        <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#666" }} />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 10, fill: "#666" }}
-                                    tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}K`}
-                                    width={45}
-                                />
-                                <Tooltip
-                                    contentStyle={{
-                                        background: "rgba(10,10,10,0.95)",
-                                        border: "1px solid rgba(255,255,255,0.1)",
-                                        borderRadius: "8px",
-                                        fontSize: "12px",
-                                        fontWeight: 300,
-                                    }}
-                                    formatter={(value: number) => [`₹${value.toLocaleString()}`, "Earnings"]}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="earnings"
-                                    stroke="rgba(255,255,255,0.5)"
-                                    strokeWidth={1.5}
-                                    fill="url(#weeklyGradient)"
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                <SpotlightCard className="p-4">
+                    <p className="text-[10px] font-light text-muted-foreground uppercase tracking-[0.2em] mb-2">Clicks</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-lg font-light tracking-tight">{clicks}</span>
+                    </div>
+                </SpotlightCard>
+                <SpotlightCard className="p-4">
+                    <p className="text-[10px] font-light text-muted-foreground uppercase tracking-[0.2em] mb-2">Conversions</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-lg font-light tracking-tight">{conversions}</span>
+                    </div>
+                </SpotlightCard>
+                <SpotlightCard className="p-4">
+                    <p className="text-[10px] font-light text-muted-foreground uppercase tracking-[0.2em] mb-2">Conv. Rate</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-lg font-light tracking-tight">{rate.toFixed(1)}%</span>
+                    </div>
+                </SpotlightCard>
+                <SpotlightCard className="p-4">
+                    <p className="text-[10px] font-light text-muted-foreground uppercase tracking-[0.2em] mb-2">Earned</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-lg font-light tracking-tight">{formatCurrency(earned)}</span>
                     </div>
                 </SpotlightCard>
             </motion.div>
@@ -857,23 +778,25 @@ function AnalyticsTab({ stats, links, products }: { stats: ReturnType<typeof use
                     ) : (
                         <div className="space-y-4">
                             {products
-                                .filter(p => p.is_active)
-                                .slice(0, 5)
+                                .sort((a, b) => {
+                                    const aClicks = links.find(l => l.product_id === a.id)?.clicks || 0
+                                    const bClicks = links.find(l => l.product_id === b.id)?.clicks || 0
+                                    return bClicks - aClicks
+                                })
+                                .slice(0, 3)
                                 .map((product, i) => {
-                                    // Count links for this product
-                                    const productLinks = links.filter(l => l.product_id === product.id)
-                                    const productClicks = productLinks.reduce((sum, l) => sum + (l.clicks || 0), 0)
-                                    const maxClicks = Math.max(...products.map(p =>
-                                        links.filter(l => l.product_id === p.id).reduce((sum, l) => sum + (l.clicks || 0), 0)
-                                    ), 1)
+                                    const productClicks = links.find(l => l.product_id === product.id)?.clicks || 0
+                                    const maxClicks = Math.max(...links.map(l => l.clicks || 0), 1)
 
                                     return (
                                         <div key={product.id} className="flex items-center gap-4">
-                                            <span className="text-xs text-muted-foreground font-light w-4">{i + 1}</span>
-                                            <div className="flex-1">
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <span className="text-sm font-light">{product.name}</span>
-                                                    <span className="text-xs text-muted-foreground font-light">{productClicks} clicks</span>
+                                            <div className="w-8 h-8 rounded bg-foreground/5 flex items-center justify-center text-xs font-light">
+                                                {i + 1}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-end mb-1">
+                                                    <p className="text-sm font-light truncate">{product.name}</p>
+                                                    <span className="text-xs text-muted-foreground">{productClicks} clicks</span>
                                                 </div>
                                                 <div className="h-1 bg-foreground/5 rounded-full overflow-hidden">
                                                     <motion.div
@@ -1043,6 +966,8 @@ export default function UnifiedDashboard() {
         switch (activeTab) {
             case "overview":
                 return <OverviewTab stats={stats} transactions={transactions} />
+            case "payouts":
+                return <WithdrawFunds />
             case "links":
                 return <LinksTab copiedStates={copiedStates} handleCopy={handleCopy} />
             case "vault":
@@ -1076,7 +1001,6 @@ export default function UnifiedDashboard() {
                             target: "body",
                             content: "Welcome to Black Index! 🚀 As a Warlord (Affiliate), your mission is to promote high-converting products and earn massive commissions. Let's show you around.",
                             placement: "center",
-                            disableBeacon: true,
                         },
                         {
                             target: "#tour-overview",
@@ -1196,7 +1120,8 @@ export default function UnifiedDashboard() {
                             <span className="text-foreground capitalize">{activeTab === "vault" ? "The Vault" : activeTab}</span>
                         </div>
                         <div className="flex items-center gap-4">
-                            <PayoutPopover balance={stats.withdrawableBalance} />
+                            <SellerWalletBalance />
+                            <NotificationsBell />
                             <div className="flex items-center gap-2">
                                 <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                                 <span className="text-[10px] text-muted-foreground font-light tracking-wide hidden sm:block">Live</span>

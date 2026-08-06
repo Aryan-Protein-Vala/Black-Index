@@ -40,14 +40,13 @@ export default function NewProductPage() {
     const [name, setName] = useState("")
     const [websiteUrl, setWebsiteUrl] = useState("")
     const [description, setDescription] = useState("")
-    const [tagline, setTagline] = useState("")
-    const [category, setCategory] = useState("")
-    const [pricing, setPricing] = useState("")
-    const [logoFile, setLogoFile] = useState<File | null>(null)
+        const [category, setCategory] = useState("b2b")
+    const [priceInr, setPriceInr] = useState("")
+    const [billingType, setBillingType] = useState<"one_time" | "subscription">("subscription")
+        const [logoFile, setLogoFile] = useState<File | null>(null)
     const [logoPreview, setLogoPreview] = useState<string | null>(null)
-    const [targetAudience, setTargetAudience] = useState("")
-    const [upfrontPct, setUpfrontPct] = useState("30")
-    const [recurringPct, setRecurringPct] = useState("15")
+        const [upfrontPct, setUpfrontPct] = useState("30")
+    const [recurringPct, setRecurringPct] = useState("0")
     const [maxRecurringMonths, setMaxRecurringMonths] = useState("12")
     const [maxCacLimit, setMaxCacLimit] = useState("")
 
@@ -57,10 +56,10 @@ export default function NewProductPage() {
         { id: "devtools", label: "DevTools" },
         { id: "marketing", label: "Marketing" },
         { id: "creator_tools", label: "Creator Tools" },
+        { id: "other", label: "Other" },
     ]
 
-    const [providedWebhookSecret, setProvidedWebhookSecret] = useState("")
-
+    
     const handleCopy = async (text: string, type: "secret" | "url") => {
         await navigator.clipboard.writeText(text)
         setCopied(type)
@@ -83,76 +82,60 @@ export default function NewProductPage() {
         reader.readAsDataURL(file)
     }
 
-    const handleSubmit = async () => {
+        const handleSubmit = async () => {
         if (!user) return
 
         setIsSubmitting(true)
         setError(null)
 
         try {
-            const supabase = createClient()
-            setWebhookSecret(providedWebhookSecret)
+            let logoUrl = null
+            if (logoFile) {
+                const supabase = createClient()
+                const fileExt = logoFile.name.split(".").pop()
+                const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+                const { error: uploadError } = await supabase.storage
+                    .from("product-logos")
+                    .upload(`${user.id}/${fileName}`, logoFile)
 
-            const commissionConfig = {
-                type: "hybrid" as const,
-                upfront_pct: parseInt(upfrontPct) || 30,
-                recurring_pct: parseInt(recurringPct) || 0,
-                max_recurring_months: parseInt(maxRecurringMonths) || 12,
-            }
-
-            // Build extended description with all details
-            const extendedDesc = [
-                description,
-                tagline ? `Tagline: ${tagline}` : null,
-                category ? `Category: ${category}` : null,
-                pricing ? `Pricing: ${pricing}` : null,
-                targetAudience ? `Target Audience: ${targetAudience}` : null,
-            ].filter(Boolean).join('\n\n')
-
-            const { data, error: insertError } = await supabase.from("products").insert({
-                founder_id: user.id,
-                name,
-                website_url: websiteUrl,
-                description: extendedDesc || null,
-                commission_config: commissionConfig,
-                max_cac_limit: maxCacLimit ? parseInt(maxCacLimit) * 100 : null,
-                webhook_secret: providedWebhookSecret,
-                settlement_mode: "webhook",
-                is_active: true,
-            } as any).select("id").single()
-
-            if (insertError) {
-                throw insertError
-            }
-
-            const productId = data?.id
-
-            // Upload logo if selected
-            if (logoFile && logoPreview) {
-                try {
-                    const base64Data = logoPreview.split(',')[1] // remove 'data:image/...;base64,'
-                    await fetch('/api/products/upload-logo', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            product_id: productId,
-                            image_data: base64Data,
-                            file_name: logoFile.name,
-                            content_type: logoFile.type
-                        })
-                    })
-                } catch (logoErr) {
-                    console.error("Logo upload failed", logoErr)
-                    toast.error("Product created, but logo upload failed.")
+                if (uploadError) {
+                    throw new Error("Failed to upload logo")
                 }
+                const { data: { publicUrl } } = supabase.storage
+                    .from("product-logos")
+                    .getPublicUrl(`${user.id}/${fileName}`)
+                logoUrl = publicUrl
             }
 
-            setCreatedProductId(productId || null)
-            toast.success("Product created! Now set up your webhook.")
+            const response = await fetch("/api/products", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name,
+                    description,
+                    website_url: websiteUrl,
+                    logo_url: logoUrl,
+                    category,
+                    price_inr: priceInr ? parseInt(priceInr) * 100 : null,
+                    billing_type: billingType,
+                    commission_config: {
+                        upfront_pct: parseInt(upfrontPct),
+                        recurring_pct: billingType === "subscription" ? parseInt(recurringPct) : 0,
+                        max_recurring_months: billingType === "subscription" ? parseInt(maxRecurringMonths) : 1,
+                    },
+                    max_cac_limit: maxCacLimit ? parseInt(maxCacLimit) * 100 : null,
+                })
+            })
+
+            const data = await response.json()
+            if (!response.ok) throw new Error(data.error || "Failed to create product")
+
+            setWebhookSecret(data.webhook_secret)
+            setCreatedProductId(data.product.id)
             setStep(2)
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to create product")
-            toast.error("Failed to create product")
+            console.error("Creation error:", err)
+            setError(err instanceof Error ? err.message : "Something went wrong")
         } finally {
             setIsSubmitting(false)
         }
@@ -241,131 +224,122 @@ export default function NewProductPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="tagline">Tagline</Label>
-                            <Input
-                                id="tagline"
-                                value={tagline}
-                                onChange={(e) => setTagline(e.target.value)}
-                                placeholder="e.g. The smarter way to prepare for NEET"
-                                className="h-12 bg-input/30"
-                            />
-                            <p className="text-xs text-muted-foreground">A catchy one-liner for sellers</p>
+                            <Label htmlFor="category">Category</Label>
+                            <select
+                                id="category"
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                className="w-full h-12 px-3 bg-input/30 border border-border/50 rounded-lg text-sm font-light focus:border-foreground/30 focus:outline-none"
+                            >
+                                {categories.map(c => (
+                                    <option key={c.id} value={c.id} className="bg-background text-foreground">{c.label}</option>
+                                ))}
+                            </select>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="category">Category</Label>
-                                <select
-                                    id="category"
-                                    value={category}
-                                    onChange={(e) => setCategory(e.target.value)}
-                                    className="w-full h-12 px-3 bg-input/30 border border-border/50 rounded-lg text-sm font-light focus:border-foreground/30 focus:outline-none"
-                                >
-                                    <option value="">Select category</option>
-                                    {categories.map((cat) => (
-                                        <option key={cat.id} value={cat.id}>{cat.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="pricing">Pricing Info</Label>
+                                <Label htmlFor="price_inr">Price (₹)</Label>
                                 <Input
-                                    id="pricing"
-                                    value={pricing}
-                                    onChange={(e) => setPricing(e.target.value)}
-                                    placeholder="e.g. ₹999/month or ₹4999 one-time"
+                                    id="price_inr"
+                                    type="number"
+                                    value={priceInr}
+                                    onChange={(e) => setPriceInr(e.target.value)}
+                                    placeholder="e.g. 4999"
                                     className="h-12 bg-input/30"
                                 />
                             </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="billing_type">Billing Type</Label>
+                                <select
+                                    id="billing_type"
+                                    value={billingType}
+                                    onChange={(e) => setBillingType(e.target.value as "one_time" | "subscription")}
+                                    className="w-full h-12 px-3 bg-input/30 border border-border/50 rounded-lg text-sm font-light focus:border-foreground/30 focus:outline-none"
+                                >
+                                    <option value="one_time" className="bg-background text-foreground">One-time</option>
+                                    <option value="subscription" className="bg-background text-foreground">Subscription</option>
+                                </select>
+                            </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="webhook_secret">Webhook Signing Secret *</Label>
-                            <Input
-                                id="webhook_secret"
-                                type="password"
-                                value={providedWebhookSecret}
-                                onChange={(e) => setProvidedWebhookSecret(e.target.value)}
-                                placeholder="Paste your Stripe/Razorpay webhook secret here"
-                                className="h-12 bg-input/30"
-                            />
-                            <p className="text-xs text-muted-foreground">Used to verify that payloads come from your server</p>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="audience">Target Audience</Label>
-                            <Input
-                                id="audience"
-                                value={targetAudience}
-                                onChange={(e) => setTargetAudience(e.target.value)}
-                                placeholder="e.g. NEET aspirants, Class 11-12 students, Medical entrance candidates"
-                                className="h-12 bg-input/30"
-                            />
-                            <p className="text-xs text-muted-foreground">Who should sellers target?</p>
-                        </div>
-
-                        <div className="border-t border-border/30 pt-6">
-                            <h3 className="text-lg font-light mb-4">Commission Structure</h3>
-
+                        <div className="space-y-4 pt-4 border-t border-border/50">
+                            <h3 className="font-medium">Commission Structure</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="upfront">Upfront Commission (%)</Label>
                                     <Input
                                         id="upfront"
                                         type="number"
+                                        min="1"
+                                        max="100"
                                         value={upfrontPct}
                                         onChange={(e) => setUpfrontPct(e.target.value)}
-                                        placeholder="30"
                                         className="h-12 bg-input/30"
                                     />
-                                    <p className="text-xs text-muted-foreground">First-time customer commission</p>
                                 </div>
-
                                 <div className="space-y-2">
                                     <Label htmlFor="recurring">Recurring Commission (%)</Label>
                                     <Input
                                         id="recurring"
                                         type="number"
+                                        min="0"
+                                        max="100"
                                         value={recurringPct}
                                         onChange={(e) => setRecurringPct(e.target.value)}
-                                        placeholder="15"
-                                        className="h-12 bg-input/30"
+                                        disabled={billingType === "one_time"}
+                                        className="h-12 bg-input/30 disabled:opacity-50"
                                     />
-                                    <p className="text-xs text-muted-foreground">Repeat purchase commission</p>
                                 </div>
-
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="months">Max Recurring Months</Label>
                                     <Input
                                         id="months"
                                         type="number"
+                                        min="1"
+                                        max="36"
                                         value={maxRecurringMonths}
                                         onChange={(e) => setMaxRecurringMonths(e.target.value)}
-                                        placeholder="12"
-                                        className="h-12 bg-input/30"
+                                        disabled={billingType === "one_time"}
+                                        className="h-12 bg-input/30 disabled:opacity-50"
                                     />
                                 </div>
-
                                 <div className="space-y-2">
-                                    <Label htmlFor="cac">Max CAC (₹) - Optional</Label>
+                                    <Label htmlFor="cac">Max CAC Limit (₹) - Optional</Label>
                                     <Input
                                         id="cac"
                                         type="number"
+                                        min="10"
+                                        max="100000"
                                         value={maxCacLimit}
                                         onChange={(e) => setMaxCacLimit(e.target.value)}
-                                        placeholder="e.g. 500"
+                                        placeholder="No cap"
                                         className="h-12 bg-input/30"
                                     />
-                                    <p className="text-xs text-muted-foreground">Cap commission per sale</p>
                                 </div>
+                            </div>
+                            
+                            {/* Calculator */}
+                            <div className="mt-4 p-4 rounded-lg bg-foreground/[0.02] border border-border/50 text-sm">
+                                <p className="text-muted-foreground mb-2">Commission Calculator:</p>
+                                <p className="font-medium text-foreground">
+                                    Seller earns ₹{priceInr ? (parseInt(priceInr) * parseInt(upfrontPct || "0") / 100).toFixed(2) : "X"} upfront 
+                                    {billingType === "subscription" && parseInt(recurringPct) > 0 ? ` (+ ₹${priceInr ? (parseInt(priceInr) * parseInt(recurringPct || "0") / 100).toFixed(2) : "Y"}/mo × ${maxRecurringMonths || "Z"} months)` : ""}
+                                    <br/>
+                                    <span className="text-muted-foreground text-xs mt-1 block">
+                                        · you pay that + 5% of it as fee · capped at ₹{maxCacLimit || "CAC"}
+                                    </span>
+                                </p>
                             </div>
                         </div>
                     </div>
-
-                    <div className="mt-8 flex justify-end">
+                    
+<div className="mt-8 flex justify-end">
                         <Button
-                            disabled={!name || !websiteUrl || !providedWebhookSecret || isSubmitting}
+                            disabled={!name || !websiteUrl || isSubmitting}
                             onClick={handleSubmit}
                             className="bg-foreground text-background hover:bg-foreground/90"
                         >
@@ -474,8 +448,8 @@ export default function NewProductPage() {
                                     <li>Go to Razorpay Dashboard → Settings → Webhooks</li>
                                     <li>Click "Add New Webhook"</li>
                                     <li>Paste the Webhook URL above</li>
-                                    <li>Select events: <code className="text-xs bg-muted/50 px-1 rounded">subscription.charged</code> and <code className="text-xs bg-muted/50 px-1 rounded">payment.captured</code></li>
-                                    <li>Add the secret key if prompted</li>
+                                    <li>Select ONLY: <code className="text-xs bg-muted/50 px-1 rounded">payment.captured</code></li>
+                                    <li>Add the Webhook Secret from above</li>
                                     <li>Save and activate</li>
                                 </ol>
                             )}
@@ -484,8 +458,9 @@ export default function NewProductPage() {
                                     <li>Go to Stripe Dashboard → Developers → Webhooks</li>
                                     <li>Click "Add endpoint"</li>
                                     <li>Paste the Webhook URL above</li>
-                                    <li>Select events: <code className="text-xs bg-muted/50 px-1 rounded">invoice.paid</code> and <code className="text-xs bg-muted/50 px-1 rounded">checkout.session.completed</code></li>
-                                    <li>Copy the signing secret and save it</li>
+                                    <li>Select ONLY: <code className="text-xs bg-muted/50 px-1 rounded">invoice.paid</code> (subscriptions) and <code className="text-xs bg-muted/50 px-1 rounded">payment_intent.succeeded</code> (one-time)</li>
+                                    <li><strong>WARNING:</strong> DO NOT enable <code className="text-xs bg-muted/50 px-1 rounded">checkout.session.completed</code> — it will double-count commissions.</li>
+                                    <li>Stripe generates its own secret. In your Black Index product edit page, replace the system secret with Stripe’s secret.</li>
                                 </ol>
                             )}
                             {selectedProvider === "lemonsqueezy" && (
@@ -493,8 +468,8 @@ export default function NewProductPage() {
                                     <li>Go to Lemon Squeezy Dashboard → Settings → Webhooks</li>
                                     <li>Click "Add webhook"</li>
                                     <li>Paste the Webhook URL above</li>
-                                    <li>Add the signing secret from above</li>
-                                    <li>Select events: <code className="text-xs bg-muted/50 px-1 rounded">order_created</code></li>
+                                    <li>Add the Webhook Secret from above</li>
+                                    <li>Select events: <code className="text-xs bg-muted/50 px-1 rounded">order_created</code>, <code className="text-xs bg-muted/50 px-1 rounded">subscription_payment_success</code>, and <code className="text-xs bg-muted/50 px-1 rounded">order_refunded</code></li>
                                 </ol>
                             )}
                             {selectedProvider === "gumroad" && (
@@ -503,6 +478,7 @@ export default function NewProductPage() {
                                     <li>Find "Ping" section</li>
                                     <li>Paste the Webhook URL above</li>
                                     <li>Gumroad will ping on every sale</li>
+                                    <li>Seller tracking via URL param: add <code>?ref_id=...</code></li>
                                 </ol>
                             )}
                             {selectedProvider === "paypal" && (
@@ -510,9 +486,12 @@ export default function NewProductPage() {
                                     <li>Go to PayPal Developer Dashboard</li>
                                     <li>Navigate to My Apps → Webhooks</li>
                                     <li>Create a webhook with the URL above</li>
-                                    <li>Select events: <code className="text-xs bg-muted/50 px-1 rounded">PAYMENT.SALE.COMPLETED</code></li>
+                                    <li>Select events: <code className="text-xs bg-muted/50 px-1 rounded">PAYMENT.SALE.COMPLETED</code> or <code className="text-xs bg-muted/50 px-1 rounded">PAYMENT.CAPTURE.COMPLETED</code></li>
                                 </ol>
                             )}
+                            <p className="mt-4 text-xs text-muted-foreground">
+                                <strong>Note:</strong> Refunds are auto-clawed back. Events without a ref ID are stored as unattributed_sale and return 200.
+                            </p>
                         </SpotlightCard>
                     </motion.div>
                 )}

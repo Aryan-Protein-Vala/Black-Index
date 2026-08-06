@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         // ================================================
         const sellerAmounts: Record<string, number> = {}
         
-        for (const txn of clearedTransactions) {
+        for (const txn of clearedTransactions as any[]) {
             const sellerId = txn.seller_id
             const amount = txn.commission_amount || 0
             sellerAmounts[sellerId] = (sellerAmounts[sellerId] || 0) + amount
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
         // ================================================
         // STEP 4: Update transaction statuses
         // ================================================
-        const transactionIds = clearedTransactions.map(t => t.id)
+        const transactionIds = (clearedTransactions as any[]).map(t => t.id)
         
         const { error: txUpdateError } = await supabase
             .from('transactions')

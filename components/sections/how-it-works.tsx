@@ -7,18 +7,18 @@ import { FadeInSection } from "@/components/ui/fade-in-section"
 
 const steps = [
   {
-    title: "Automated Splits",
-    caption: "Founders set their own commission rates. Stripe and Razorpay handle the split automatically at checkout.",
+    title: "Wallet Escrow",
+    caption: "Founders prepay a wallet. Commissions are escrowed for 30 days, then paid directly via UPI.",
     icon: Split,
   },
   {
-    title: "Recurring Identity Lock",
-    caption: "Commissions aren't based on cookies. We lock the Warlord to the Stripe Customer ID for lifetime tracking.",
+    title: "Duration Lock",
+    caption: "Commissions are tied to the exact month limit set by the founder — no cookies, true backend tracking.",
     icon: Shield,
   },
   {
     title: "The Vault",
-    caption: "High-tier Warlords get exclusive access to promote the world's fastest-growing SaaS products.",
+    caption: "Warlords browse the Vault to promote verified SaaS products proven to convert.",
     icon: Lock,
   },
 ]

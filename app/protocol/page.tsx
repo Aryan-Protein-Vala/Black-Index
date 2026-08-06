@@ -246,7 +246,7 @@ export default function ProtocolPage() {
                                         Warlords choose which products to promote based on these metrics. Higher commissions attract more "Elite" sellers, while recurring royalties build a loyal, long-term sales force for your brand.
                                     </p>
                                     <p>
-                                        The platform fee is a flat 5% on top of the transaction value, which covers the trustless tracking, automated split logic, and secure payouts.
+                                        The platform fee is 5% of the commission, which covers the trustless tracking, automated split logic, and secure payouts.
                                     </p>
                                 </div>
                             </div>
@@ -310,7 +310,7 @@ export default function ProtocolPage() {
                                     <div>
                                         <h4 className="text-sm font-medium text-foreground mb-2">The "Serious Player" Threshold</h4>
                                         <p className="text-xs text-muted-foreground font-light">
-                                            Minimum withdrawal is ₹3,000. This mathematically stops discount hackers, as their money is stuck until they earn significantly more.
+                                            Minimum withdrawal is ₹1,000. This mathematically stops discount hackers, as their money is stuck until they earn significantly more.
                                         </p>
                                     </div>
                                 </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Joyride, CallBackProps, STATUS, Step, TooltipRenderProps } from "react-joyride"
+import { Joyride, STATUS, Step, TooltipRenderProps } from "react-joyride"
 import { useAuth } from "@/components/auth-provider"
 import { toast } from "sonner"
 
@@ -104,7 +104,7 @@ export function ProductTour({ steps, tourType, run: initialRun }: ProductTourPro
         )
     }
 
-    const handleJoyrideCallback = async (data: CallBackProps) => {
+    const handleJoyrideCallback = async (data: any) => {
         const { status, type } = data
         console.log('Joyride Callback (Internal):', data)
         // We now handle completion directly in the button clicks, 
@@ -117,14 +117,14 @@ export function ProductTour({ steps, tourType, run: initialRun }: ProductTourPro
 
     if (!run) return null
 
+    const JoyrideComponent = Joyride as any
+
     return (
-        <Joyride
+        <JoyrideComponent
             steps={steps}
             run={run}
             continuous={true}
             scrollToFirstStep={true}
-            showProgress={true}
-            showSkipButton={true}
             callback={handleJoyrideCallback}
             tooltipComponent={CustomTooltip}
             styles={{
@@ -132,7 +132,7 @@ export function ProductTour({ steps, tourType, run: initialRun }: ProductTourPro
                     zIndex: 1000,
                     overlayColor: 'rgba(0, 0, 0, 0.85)',
                 }
-            }}
+            } as any}
         />
     )
 }

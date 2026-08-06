@@ -20,8 +20,10 @@ import { createClient } from "@/lib/supabase"
 import { formatCurrency } from "@/hooks/use-dashboard-data"
 import type { Product, Transaction } from "@/lib/database.types"
 import { SetupBilling } from "@/components/founder/setup-billing"
+import { FounderWalletBalance } from "@/components/founder/founder-wallet-balance"
 import { toast } from "sonner"
 import { ProductTour } from "@/components/product-tour"
+import { NotificationsBell } from "@/components/notifications-bell"
 
 const sidebarItems = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -34,15 +36,38 @@ const sidebarItems = [
 // ============================================
 // OVERVIEW TAB
 // ============================================
-function OverviewTab({ products, transactions, isLoading }: {
+function OverviewTab({ products, transactions, isLoading, fetchError, onRetry }: {
     products: Product[]
     transactions: Transaction[]
     isLoading: boolean
+    fetchError?: boolean
+    onRetry?: () => void
 }) {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-20">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+        )
+    }
+
+    if (fetchError) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                <AlertCircle className="w-8 h-8 text-red-500" />
+                <p className="text-muted-foreground">Failed to load data.</p>
+                <Button onClick={onRetry} variant="outline" size="sm">Retry</Button>
+            </div>
+        )
+    }
+
+    if (!isLoading && !fetchError && transactions.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 space-y-4 text-center">
+                <div className="w-12 h-12 rounded-full bg-foreground/5 flex items-center justify-center mb-4">
+                    <TrendingUp className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <p className="text-lg font-light">No sales yet — finish setup and run the Gauntlet</p>
             </div>
         )
     }
@@ -205,7 +230,7 @@ function OverviewTab({ products, transactions, isLoading }: {
 // ============================================
 // PRODUCTS TAB
 // ============================================
-function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; isLoading: boolean; onRefresh: () => void }) {
+function ProductsTab({ products, isLoading, onRefresh, fetchError }: { products: Product[]; isLoading: boolean; onRefresh: () => void; fetchError?: boolean }) {
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [confirmDelete, setConfirmDelete] = useState<Product | null>(null)
     const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -214,6 +239,24 @@ function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; 
     const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
     const [testingWebhook, setTestingWebhook] = useState(false)
     const [webhookTestResult, setWebhookTestResult] = useState<{ success: boolean; message: string } | null>(null)
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+        )
+    }
+
+    if (fetchError) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                <AlertCircle className="w-8 h-8 text-red-500" />
+                <p className="text-muted-foreground">Failed to load products.</p>
+                <Button onClick={onRefresh} variant="outline" size="sm">Retry</Button>
+            </div>
+        )
+    }
 
     const handleCopyUrl = (url: string, provider: string) => {
         navigator.clipboard.writeText(url)
@@ -735,11 +778,21 @@ function ProductsTab({ products, isLoading, onRefresh }: { products: Product[]; 
 // ============================================
 // ACTIVITY TAB
 // ============================================
-function ActivityTab({ transactions, isLoading }: { transactions: Transaction[]; isLoading: boolean }) {
+function ActivityTab({ transactions, isLoading, fetchError, onRetry }: { transactions: Transaction[]; isLoading: boolean; fetchError?: boolean; onRetry?: () => void }) {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-20">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+        )
+    }
+
+    if (fetchError) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                <AlertCircle className="w-8 h-8 text-red-500" />
+                <p className="text-muted-foreground">Failed to load activity.</p>
+                <Button onClick={onRetry} variant="outline" size="sm">Retry</Button>
             </div>
         )
     }
@@ -877,41 +930,55 @@ export default function FounderDashboard() {
     const [products, setProducts] = useState<Product[]>([])
     const [transactions, setTransactions] = useState<Transaction[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [fetchError, setFetchError] = useState(false)
 
     const { user, profile, isLoading: authLoading, signOut } = useAuth()
 
     // Fetch founder's products and transactions
     const fetchData = async () => {
         if (!user) return
+        setIsLoading(true)
+        setFetchError(false)
 
-        const supabase = createClient()
+        try {
+            const supabase = createClient()
 
-        // SECURITY: Only select non-sensitive fields - webhook_secret must NEVER be returned to client
-        const { data: productsData } = await supabase
-            .from("products")
-            .select("id, name, description, logo_url, website_url, is_active, is_founders_choice, is_featured, featured_until, commission_config, max_cac_limit, created_at, settlement_mode, founder_id, webhook_secret")
-            .eq("founder_id", user.id)
-            .order("created_at", { ascending: false })
+            // SECURITY: Only select non-sensitive fields - webhook_secret must NEVER be returned to client
+            const { data: productsData, error: productsError } = await supabase
+                .from("products")
+                .select("id, name, description, logo_url, website_url, is_active, is_founders_choice, is_featured, featured_until, commission_config, max_cac_limit, created_at, settlement_mode, founder_id, webhook_secret")
+                .eq("founder_id", user.id)
+                .order("created_at", { ascending: false })
 
-        if (productsData) {
-            const typedProducts = productsData as unknown as Product[]
-            setProducts(typedProducts)
+            if (productsError) throw productsError
 
-            const productIds = typedProducts.map(p => p.id)
-            if (productIds.length > 0) {
-                const { data: txData } = await supabase
-                    .from("transactions")
-                    .select("*")
-                    .in("product_id", productIds)
-                    .order("created_at", { ascending: false })
+            if (productsData) {
+                const typedProducts = productsData as unknown as Product[]
+                setProducts(typedProducts)
 
-                if (txData) {
-                    setTransactions(txData as Transaction[])
+                const productIds = typedProducts.map(p => p.id)
+                if (productIds.length > 0) {
+                    const { data: txData, error: txError } = await supabase
+                        .from("transactions")
+                        .select("*")
+                        .in("product_id", productIds)
+                        .order("created_at", { ascending: false })
+
+                    if (txError) throw txError
+
+                    if (txData) {
+                        setTransactions(txData as Transaction[])
+                    }
+                } else {
+                    setTransactions([])
                 }
             }
+        } catch (err) {
+            console.error("Failed to load dashboard data", err)
+            setFetchError(true)
+        } finally {
+            setIsLoading(false)
         }
-
-        setIsLoading(false)
     }
 
     useEffect(() => {
@@ -930,17 +997,17 @@ export default function FounderDashboard() {
     const renderTabContent = () => {
         switch (activeTab) {
             case "overview":
-                return <OverviewTab products={products} transactions={transactions} isLoading={isLoading} />
+                return <OverviewTab products={products} transactions={transactions} isLoading={isLoading} fetchError={fetchError} onRetry={fetchData} />
             case "products":
-                return <ProductsTab products={products} isLoading={isLoading} onRefresh={fetchData} />
+                return <ProductsTab products={products} isLoading={isLoading} onRefresh={fetchData} fetchError={fetchError} />
             case "activity":
-                return <ActivityTab transactions={transactions} isLoading={isLoading} />
+                return <ActivityTab transactions={transactions} isLoading={isLoading} fetchError={fetchError} onRetry={fetchData} />
             case "billing":
                 return <SetupBilling />
             case "settings":
                 return <SettingsTab profile={profile} signOut={signOut} />
             default:
-                return <OverviewTab products={products} transactions={transactions} isLoading={isLoading} />
+                return <OverviewTab products={products} transactions={transactions} isLoading={isLoading} fetchError={fetchError} onRetry={fetchData} />
         }
     }
 
@@ -964,7 +1031,6 @@ export default function FounderDashboard() {
                             target: "body",
                             content: "Welcome to the Founder Tier! 👑 As a Founder, you can list your software products, set up automated commission splits, and let an army of affiliates sell for you.",
                             placement: "center",
-                            disableBeacon: true,
                         },
                         {
                             target: "#tour-founder-overview",
@@ -1069,6 +1135,8 @@ export default function FounderDashboard() {
                             <span className="text-foreground capitalize">{activeTab}</span>
                         </div>
                         <div className="flex items-center gap-4">
+                            <FounderWalletBalance />
+                            <NotificationsBell />
                             <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400">Founder</span>
                             <div className="flex items-center gap-2">
                                 <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />

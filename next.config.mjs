@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // TODO: Fix 17 pre-existing TS errors in dashboard pages (as never pattern), then set to false
-  typescript: { ignoreBuildErrors: true },
+  typescript: { ignoreBuildErrors: false },
   images: {
     unoptimized: true,
   },

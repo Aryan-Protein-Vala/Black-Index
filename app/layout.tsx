@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Inter } from "next/font/google"
+
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "sonner"
 import "./globals.css"
@@ -9,10 +9,8 @@ import { AuthProvider } from "@/components/auth-provider"
 import { ConfirmProvider } from "@/components/confirm-provider"
 import Script from "next/script"
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-})
+const inter = { className: "" };
+
 
 export const metadata: Metadata = {
   title: {

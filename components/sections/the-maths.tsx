@@ -52,24 +52,24 @@ export function TheMathsSection() {
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between py-3 border-b border-border/30 gap-2">
-                      <span className="text-sm text-muted-foreground font-light shrink-0">First month (40%)</span>
-                      <span className="text-base sm:text-lg font-light text-foreground text-right">₹4,00,000</span>
+                      <span className="text-sm text-muted-foreground font-light shrink-0">Upfront (30%)</span>
+                      <span className="text-base sm:text-lg font-light text-foreground text-right">₹3,00,000</span>
                     </div>
                     <div className="flex items-center justify-between py-3 border-b border-border/30 gap-2">
-                      <span className="text-sm text-muted-foreground font-light shrink-0">Monthly (20%)</span>
-                      <span className="text-base sm:text-lg font-light text-foreground text-right">₹2,00,000</span>
+                      <span className="text-sm text-muted-foreground font-light shrink-0">Monthly (15%)</span>
+                      <span className="text-base sm:text-lg font-light text-foreground text-right">₹1,50,000</span>
                     </div>
                     <div className="flex items-center justify-between py-3 gap-2">
                       <span className="text-sm font-light shrink-0">Year 1 Total</span>
-                      <span className="text-xl sm:text-2xl font-light text-foreground text-right">₹26,00,000</span>
+                      <span className="text-xl sm:text-2xl font-light text-foreground text-right">₹19,50,000</span>
                     </div>
                   </div>
 
                   <p className="text-xs text-muted-foreground font-light text-center">
-                    Your customers keep paying → You keep earning. That's MRR for Warlords.
+                    Your customers keep paying → You keep earning. (Platform takes 5% of the commission)
                   </p>
                   <div className="pt-4 border-t border-border/30 mt-4">
-                    <p className="text-sm font-light text-center text-foreground">Sell once, earn forever<span className="text-muted-foreground">*</span></p>
+                    <p className="text-sm font-light text-center text-foreground">Build recurring income</p>
                   </div>
                 </div>
               </SpotlightCard>
@@ -113,13 +113,13 @@ export function TheMathsSection() {
                       <span className="text-base sm:text-lg font-light text-foreground text-right">₹1,00,00,000</span>
                     </div>
                     <div className="flex items-center justify-between py-3 gap-2">
-                      <span className="text-sm font-light shrink-0">Cost (20%)</span>
-                      <span className="text-xl sm:text-2xl font-light text-foreground text-right">₹20,00,000</span>
+                      <span className="text-sm font-light shrink-0">Cost (30%)</span>
+                      <span className="text-xl sm:text-2xl font-light text-foreground text-right">₹30,00,000</span>
                     </div>
                   </div>
 
                   <p className="text-xs text-muted-foreground font-light text-center">
-                    ₹1 Crore revenue for ₹20 Lakh CAC. No salaries. No overhead. Just results.
+                    ₹1 Crore revenue for ₹30 Lakh CAC. Warlords pay the 5% platform fee from their commission.
                   </p>
                   <div className="pt-4 border-t border-border/30 mt-4">
                     <p className="text-sm font-light text-center text-foreground">1,000 salespeople. Zero payroll.</p>
@@ -136,7 +136,7 @@ export function TheMathsSection() {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="mt-8 text-xs font-light text-muted-foreground/50 text-center"
           >
-            *Commission rates are set by founders. See <a href="/terms#recurring-commission" className="underline hover:text-foreground transition-colors">terms</a> for recurring commission details.
+            *Commission rates and duration are set by founders. Platform takes 5% of the commission.
           </motion.p>
         </div>
       </section>

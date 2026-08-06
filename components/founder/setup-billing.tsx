@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CreditCard, Shield, Check, ExternalLink, Loader2, Crown, Wallet, Plus, Globe, MapPin } from "lucide-react"
+import { CreditCard, Shield, Check, ExternalLink, Loader2, Crown, Wallet, Plus, Globe, MapPin, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SpotlightCard } from "@/components/ui/spotlight-card"
 import { useAuth } from "@/components/auth-provider"
@@ -14,24 +14,34 @@ export function SetupBilling() {
     const [region, setRegion] = useState<'india' | 'international'>('india')
     
     const [isLoading, setIsLoading] = useState(false)
-    const [isSubmittingDeposit, setIsSubmittingDeposit] = useState(false)
-    const [isConnectingRazorpay, setIsConnectingRazorpay] = useState(false)
     const [isDepositingWallet, setIsDepositingWallet] = useState(false)
-
-    // REAL STATE WIRED TO DATABASE
-    const [depositPaid, setDepositPaid] = useState(false)
     const [walletBalance, setWalletBalance] = useState(0)
-    const [razorpayConnected, setRazorpayConnected] = useState(false)
+
+    // For statement table
+    const [transactions, setTransactions] = useState<any[]>([])
 
     useEffect(() => {
         if (profile) {
-            setDepositPaid(!!(profile as any).security_deposit_paid)
             setWalletBalance(Number((profile as any).wallet_balance) || 0)
-            setRazorpayConnected(!!(profile as any).razorpay_account_id)
+            fetchStatements()
         }
     }, [profile])
 
-    const isForeverPro = user?.email && FOREVER_PRO_EMAILS.includes(user.email)
+    const fetchStatements = async () => {
+        if (!user) return
+        try {
+            const supabase = (await import("@/lib/supabase")).createClient()
+            const { data } = await supabase
+                .from("transactions")
+                .select("*")
+                .eq("founder_id", user.id)
+                .order("created_at", { ascending: false })
+                .limit(20)
+            if (data) setTransactions(data)
+        } catch (e) {
+            console.error("Failed to fetch statements", e)
+        }
+    }
 
     const loadRazorpay = async () => {
         return new Promise((resolve) => {
@@ -44,13 +54,7 @@ export function SetupBilling() {
         })
     }
 
-    const USD_TO_INR = 84
-
-    const handleConnectRazorpay = async () => {
-        setIsConnectingRazorpay(true)
-        toast.info("Razorpay Route integration coming soon!")
-        setTimeout(() => setIsConnectingRazorpay(false), 1500)
-    }
+    const USD_TO_INR = 84 // Or get from your FX env/lib
 
     const handleDepositWallet = async () => {
         if (!user) return
@@ -98,6 +102,7 @@ export function SetupBilling() {
                     if (!verifyRes.ok) throw new Error("Verification failed")
                     toast.success("Wallet deposited successfully!")
                     await refreshProfile()
+                    await fetchStatements()
                 },
                 prefill: { email: user.email },
                 theme: { color: "#10b981" },
@@ -110,20 +115,6 @@ export function SetupBilling() {
         } finally {
             setIsDepositingWallet(false)
         }
-    }
-
-    if (isForeverPro) {
-        return (
-            <SpotlightCard className="p-6">
-                <div className="flex items-start gap-4">
-                    <Crown className="w-8 h-8 text-yellow-500" />
-                    <div>
-                        <h3 className="text-xl font-light">Forever Pro Founder</h3>
-                        <p className="text-sm text-muted-foreground font-light">You have unlimited, deposit-free access.</p>
-                    </div>
-                </div>
-            </SpotlightCard>
-        )
     }
 
     return (
@@ -145,52 +136,103 @@ export function SetupBilling() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Auto-Split Tier */}
-                <SpotlightCard className={`p-6 ${region === 'international' ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <div className="flex items-start gap-4 mb-6">
-                        <CreditCard className="w-8 h-8 text-blue-400" />
-                        <div>
-                            <h3 className="text-lg font-light">Tier 1: Auto-Split</h3>
-                            <p className="text-sm text-muted-foreground font-light">
-                                Connect Razorpay Route to automate commissions. <br/>
-                                <span className="text-blue-400 text-xs font-semibold">Available in India Only</span>
-                            </p>
-                        </div>
-                    </div>
-                    <Button 
-                        variant="outline" 
-                        className="w-full" 
-                        onClick={handleConnectRazorpay}
-                        disabled={region === 'international' || razorpayConnected || isConnectingRazorpay}
-                    >
-                        {isConnectingRazorpay ? "Connecting..." : razorpayConnected ? "Razorpay Connected" : "Connect Razorpay Route"}
-                    </Button>
-                </SpotlightCard>
-
-                {/* Pre-Paid Wallet Tier */}
-                <SpotlightCard className="p-6">
+                {/* Pre-Paid Wallet Tier - Front and Center */}
+                <SpotlightCard className="p-6 md:col-span-2 lg:col-span-1 border-green-500/30">
                     <div className="flex items-start gap-4 mb-6">
                         <Wallet className="w-8 h-8 text-emerald-400" />
                         <div>
-                            <h3 className="text-lg font-light">Tier 2: Pre-Paid Wallet</h3>
+                            <h3 className="text-lg font-light">Platform Wallet</h3>
                             <p className="text-sm text-muted-foreground font-light">
-                                For Lemon Squeezy / Gumroad users. Pre-fund a wallet to pay Warlords.
+                                Fund your wallet to auto-pay your Warlords.
                             </p>
                         </div>
                     </div>
                     <div className="bg-foreground/5 rounded-lg p-4 mb-4">
                         <p className="text-xs text-muted-foreground uppercase">Wallet Balance</p>
-                        <p className="text-2xl font-light">
+                        <p className="text-3xl font-light">
                             {region === 'india' 
                                 ? `₹${(walletBalance / 100).toLocaleString('en-IN')}` 
                                 : `$${(walletBalance / (100 * USD_TO_INR)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                         </p>
+                        {walletBalance < 50000 && (
+                            <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" /> Low balance warning: products auto-pause below ₹500
+                            </p>
+                        )}
                     </div>
-                    <Button onClick={handleDepositWallet} disabled={isDepositingWallet} className="w-full">
-                        {isDepositingWallet ? "Processing..." : `Deposit ${region === 'india' ? '₹10,000' : '$120'}`}
+                    <Button onClick={handleDepositWallet} disabled={isDepositingWallet} className="w-full bg-emerald-500 text-black hover:bg-emerald-600">
+                        {isDepositingWallet ? "Processing..." : `Add Funds (Min ${region === 'india' ? '₹1,000' : '$12'})`}
+                    </Button>
+                </SpotlightCard>
+
+                {/* Auto-Split Tier */}
+                <SpotlightCard className="p-6 opacity-50 relative overflow-hidden">
+                    <div className="absolute top-4 right-4 bg-foreground/10 text-foreground text-[10px] px-2 py-1 rounded font-medium tracking-wide">
+                        COMING SOON
+                    </div>
+                    <div className="flex items-start gap-4 mb-6">
+                        <CreditCard className="w-8 h-8 text-blue-400" />
+                        <div>
+                            <h3 className="text-lg font-light text-muted-foreground">Auto-Split at Checkout</h3>
+                            <p className="text-sm text-muted-foreground/50 font-light">
+                                Connect Razorpay Route to split commissions automatically.
+                            </p>
+                        </div>
+                    </div>
+                    <Button 
+                        variant="outline" 
+                        className="w-full opacity-50 cursor-not-allowed" 
+                        disabled
+                    >
+                        Connect Razorpay Route
                     </Button>
                 </SpotlightCard>
             </div>
+
+            {/* Statements View */}
+            <SpotlightCard className="p-6">
+                <h3 className="text-lg font-light mb-4">Ledger Statements</h3>
+                {transactions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No transactions yet.</p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-xs text-muted-foreground uppercase border-b border-border/50">
+                                <tr>
+                                    <th className="pb-3 font-medium">Date</th>
+                                    <th className="pb-3 font-medium">Type</th>
+                                    <th className="pb-3 font-medium text-right">Amount</th>
+                                    <th className="pb-3 font-medium">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/20">
+                                {transactions.map(tx => (
+                                    <tr key={tx.id} className="hover:bg-foreground/[0.02]">
+                                        <td className="py-3 font-light text-muted-foreground">
+                                            {new Date(tx.created_at).toLocaleDateString()}
+                                        </td>
+                                        <td className="py-3 capitalize">
+                                            {tx.type}
+                                        </td>
+                                        <td className={`py-3 text-right ${tx.type === 'deposit' ? 'text-green-400' : 'text-red-400'}`}>
+                                            {tx.type === 'deposit' ? '+' : '-'}₹{(Math.abs(tx.commission_amount || tx.sale_amount || 0) / 100).toLocaleString('en-IN')}
+                                        </td>
+                                        <td className="py-3">
+                                            <span className={`px-2 py-1 text-[10px] rounded ${
+                                                tx.billing_status === 'billed' || tx.status === 'paid' ? 'bg-green-500/10 text-green-400' :
+                                                tx.billing_status === 'wallet_insufficient' ? 'bg-yellow-500/10 text-yellow-400' :
+                                                'bg-foreground/10 text-muted-foreground'
+                                            }`}>
+                                                {tx.billing_status === 'wallet_insufficient' ? 'Queued — pays out automatically on top-up' : tx.billing_status || tx.status || 'Success'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </SpotlightCard>
         </div>
     )
 }

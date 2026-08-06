@@ -59,7 +59,7 @@ export function BecomeSellerModal({ isOpen, onClose, onSuccess }: BecomeSellerMo
                 amount: SELLER_PRICING.price * 100, // In paise
                 currency: "INR",
                 name: "Black Index",
-                description: "Become a Seller - Monthly Subscription",
+                description: "Become a Founder - One-time",
                 order_id: data.orderId,
                 handler: async function (response: any) {
                     // Verify payment
@@ -140,7 +140,7 @@ export function BecomeSellerModal({ isOpen, onClose, onSuccess }: BecomeSellerMo
                                 <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-500/20 to-yellow-600/20 flex items-center justify-center mx-auto mb-4">
                                     <Crown className="w-8 h-8 text-amber-500" />
                                 </div>
-                                <h2 className="text-2xl font-light tracking-tight">Become a Seller</h2>
+                                <h2 className="text-2xl font-light tracking-tight">Become a Founder</h2>
                                 <p className="text-sm text-muted-foreground mt-2">
                                     Unlock the power to list your own products
                                 </p>
@@ -151,12 +151,12 @@ export function BecomeSellerModal({ isOpen, onClose, onSuccess }: BecomeSellerMo
                                 <div className="inline-flex items-baseline gap-2">
                                     <span className="text-2xl text-muted-foreground line-through decoration-red-500/50">₹500</span>
                                     <span className="text-4xl font-light text-green-400">₹{SELLER_PRICING.price}</span>
-                                    <span className="text-muted-foreground text-sm">/month</span>
+                                    <span className="text-muted-foreground text-sm">one-time</span>
                                 </div>
                                 <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 text-xs font-medium">
                                     🎉 Launch Special Discount
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-3">Cancel anytime</p>
+                                <p className="text-xs text-muted-foreground mt-3">Lifetime access</p>
                             </div>
 
                             {/* Features */}
@@ -190,7 +190,7 @@ export function BecomeSellerModal({ isOpen, onClose, onSuccess }: BecomeSellerMo
                                 ) : (
                                     <>
                                         <Crown className="w-4 h-4 mr-2" />
-                                        Upgrade Now
+                                        Pay ₹100 once
                                     </>
                                 )}
                             </Button>

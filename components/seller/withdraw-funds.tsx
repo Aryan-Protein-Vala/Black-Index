@@ -18,6 +18,7 @@ interface WithdrawStatus {
 export function WithdrawFunds() {
     const [status, setStatus] = useState<WithdrawStatus | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [fetchError, setFetchError] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [upiVpa, setUpiVpa] = useState("")
     const [amount, setAmount] = useState("")
@@ -29,12 +30,16 @@ export function WithdrawFunds() {
     }, [])
 
     const fetchStatus = async () => {
+        setIsLoading(true)
+        setFetchError(false)
         try {
             const response = await fetch("/api/sellers/withdraw")
+            if (!response.ok) throw new Error("Failed to fetch")
             const data = await response.json()
             setStatus(data)
         } catch (err) {
             console.error("Failed to fetch withdraw status:", err)
+            setFetchError(true)
         } finally {
             setIsLoading(false)
         }
@@ -47,9 +52,21 @@ export function WithdrawFunds() {
         try {
             const withdrawAmount = parseFloat(amount) * 100 // Convert to paise
 
+            if (withdrawAmount > (status?.withdrawableBalance || 0)) {
+                throw new Error("Amount exceeds withdrawable balance")
+            }
+
+            const upiPattern = /^[a-zA-Z0-9._-]{2,}@[a-zA-Z]{2,}$/
+            if (!status?.hasUpi && !upiPattern.test(upiVpa)) {
+                throw new Error("Invalid UPI VPA format")
+            }
+
             const response = await fetch("/api/sellers/withdraw", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Idempotency-Key": crypto.randomUUID()
+                },
                 body: JSON.stringify({
                     amount: withdrawAmount,
                     upiVpa: upiVpa || undefined,
@@ -77,6 +94,16 @@ export function WithdrawFunds() {
         return (
             <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+        )
+    }
+
+    if (fetchError) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <AlertCircle className="w-8 h-8 text-red-500" />
+                <p className="text-muted-foreground">Failed to load balance</p>
+                <Button onClick={fetchStatus} variant="outline" size="sm">Retry</Button>
             </div>
         )
     }
@@ -227,13 +254,6 @@ export function WithdrawFunds() {
                     </>
                 )}
             </SpotlightCard>
-
-            {/* Coming Soon Notice */}
-            <div className="text-center p-4 rounded-lg border border-border/30 bg-foreground/[0.02]">
-                <p className="text-xs text-muted-foreground">
-                    ⚠️ Automated UPI payouts coming soon. Contact support for manual withdrawals.
-                </p>
-            </div>
         </motion.div>
     )
 }

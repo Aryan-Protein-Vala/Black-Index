@@ -164,7 +164,7 @@ export default function EarlyAccessPage() {
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-foreground/5 border border-border/50 mb-8"
                     >
                         <span className="text-xs text-muted-foreground font-light tracking-wide">
-                            🚀 Launching Soon — {10000 - waitlistCount} spots left
+                            🚀 Launching Soon — {Math.max(0, 10000 - waitlistCount)} spots left
                         </span>
                     </motion.div>
 

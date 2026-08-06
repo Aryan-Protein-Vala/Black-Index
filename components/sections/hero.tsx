@@ -8,7 +8,7 @@ import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 
 const titleWords = ["Black", "Index"]
-const subtitleWords = ["The", "Performance", "Layer", "for", "SaaS."]
+const subtitleWords = ["The", "Affiliate", "Marketplace", "for", "Indian", "SaaS."]
 
 export function HeroSection() {
   const ref = useRef<HTMLElement>(null)
@@ -62,7 +62,7 @@ export function HeroSection() {
           transition={{ duration: 0.5, delay: 0.6 }}
           className="mt-8 text-lg md:text-xl font-light text-muted-foreground tracking-tight max-w-xl"
         >
-          Products meet performance. Revenue follows results.
+          Sell SaaS. Others promote it. They earn recurring commission paid straight to UPI.
         </motion.p>
         <motion.div
           initial={{ opacity: 0, y: 20 }}

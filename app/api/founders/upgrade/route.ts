@@ -50,9 +50,10 @@ export async function POST() {
             .maybeSingle()
 
         if (existingPayment) {
+            const ep = existingPayment as any
             return NextResponse.json({
-                orderId: existingPayment.order_id,
-                amount: existingPayment.amount,
+                orderId: ep.order_id,
+                amount: ep.amount,
                 email: user.email,
                 name: profileData?.full_name,
                 phone: null,

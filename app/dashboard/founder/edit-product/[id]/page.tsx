@@ -44,6 +44,8 @@ export default function EditProductPage() {
     const [meetingCommissionFlat, setMeetingCommissionFlat] = useState("")
     const [shopifySecret, setShopifySecret] = useState("")
     const [isSavingShopify, setIsSavingShopify] = useState(false)
+    const [webhookSecret, setWebhookSecret] = useState("")
+    const [isSavingWebhookSecret, setIsSavingWebhookSecret] = useState(false)
 
     const categories = [
         { id: "ai_saas", label: "AI SaaS" },
@@ -206,6 +208,29 @@ export default function EditProductPage() {
             toast.error(err instanceof Error ? err.message : "Failed to save Shopify secret")
         } finally {
             setIsSavingShopify(false)
+        }
+    }
+
+    const saveWebhookSecret = async () => {
+        if (!webhookSecret.trim()) {
+            toast.error("Enter the webhook secret first")
+            return
+        }
+        setIsSavingWebhookSecret(true)
+        try {
+            const response = await fetch(`/api/products/${productId}/webhook-secret`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ secret: webhookSecret.trim() }),
+            })
+            const data = await response.json()
+            if (!response.ok) throw new Error(data.error || "Failed to save webhook secret")
+            toast.success("Webhook secret updated!")
+            setWebhookSecret("")
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to save webhook secret")
+        } finally {
+            setIsSavingWebhookSecret(false)
         }
     }
 
@@ -436,6 +461,36 @@ export default function EditProductPage() {
                                     min="1"
                                 />
                             </div>
+                        </div>
+                    </SpotlightCard>
+
+                    <SpotlightCard className="p-6">
+                        <h3 className="text-lg font-light mb-1">Provider Webhook Secret</h3>
+                        <p className="text-xs text-muted-foreground mb-4">
+                            For Razorpay / Lemon Squeezy: keep the secret shown at creation. For Stripe: paste Stripe&apos;s endpoint signing secret (<code className="text-xs bg-muted/50 px-1 rounded">whsec_...</code>) here — Stripe generates its own, so it must be set this way.
+                        </p>
+                        <div className="flex items-end gap-3">
+                            <div className="space-y-2 flex-1">
+                                <Label htmlFor="webhook_secret">Webhook Signing Secret</Label>
+                                <Input
+                                    id="webhook_secret"
+                                    type="password"
+                                    value={webhookSecret}
+                                    onChange={(e) => setWebhookSecret(e.target.value)}
+                                    placeholder="whsec_... or your secret"
+                                    className="h-12 bg-input/30"
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={saveWebhookSecret}
+                                disabled={isSavingWebhookSecret}
+                                className="h-12"
+                            >
+                                {isSavingWebhookSecret ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <KeyRound className="w-4 h-4 mr-2" />}
+                                Save Secret
+                            </Button>
                         </div>
                     </SpotlightCard>
 

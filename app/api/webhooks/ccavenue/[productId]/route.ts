@@ -68,7 +68,7 @@ export async function POST(
             return NextResponse.json({ error: 'Product not found' }, { status: 404 })
         }
 
-        const payload = decryptCCAvenueResponse(encResp, product.webhook_secret)
+        const payload = decryptCCAvenueResponse(encResp, (product as any).webhook_secret)
 
         if (!payload) {
             return NextResponse.json({ error: 'Failed to decrypt response. Check Working Key.' }, { status: 401 })

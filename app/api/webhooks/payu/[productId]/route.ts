@@ -64,7 +64,7 @@ export async function POST(
             return NextResponse.json({ error: 'Product not found' }, { status: 404 })
         }
 
-        if (!verifySignature(payload, product.webhook_secret)) {
+        if (!verifySignature(payload, (product as any).webhook_secret)) {
             return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
         }
 

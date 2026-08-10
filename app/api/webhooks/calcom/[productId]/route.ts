@@ -83,24 +83,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
             const sellerId = (link as any).seller_id
 
-            // COLLUSION HEURISTIC
+            // COLLUSION HEURISTIC — compare against BOTH profiles.phone and upi_vpa
             const { data: sellerProfile } = await adminClient
                 .from('profiles')
-                .select('email, upi_vpa')
+                .select('email, phone, upi_vpa')
                 .eq('id', sellerId)
                 .single()
 
             const sellerEmail = (sellerProfile as any)?.email
-            const sellerPhone = (sellerProfile as any)?.upi_vpa // sometimes phone is in upi
-            
+            const sellerPhone = (sellerProfile as any)?.phone
+            const sellerVpa = (sellerProfile as any)?.upi_vpa
+
+            const phoneMatches =
+                (attendeePhone && sellerPhone && attendeePhone === sellerPhone) ||
+                (attendeePhone && sellerVpa && attendeePhone === sellerVpa)
+
             if ((attendeeEmail && sellerEmail && attendeeEmail.toLowerCase() === sellerEmail.toLowerCase()) ||
-                (attendeePhone && sellerPhone && attendeePhone === sellerPhone)) {
+                phoneMatches) {
                 
                 // Flag fraud
                 await adminClient.from('fraud_reports').insert({
                     product_id: productId,
                     founder_id: p.founder_id,
-                    reporter_id: sellerId, // system generated essentially
+                    reporter_id: p.founder_id, // system heuristic — attributed to founder, not seller
                     evidence_url: 'system_heuristic',
                     description: 'Self-booking detected based on email/phone match.',
                     status: 'confirmed'
@@ -129,6 +134,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             if (rpcError) {
                 console.error("RPC Error:", rpcError)
                 return NextResponse.json({ error: rpcError.message }, { status: 500 })
+            }
+
+            // Graceful handling of business-level rejections (product inactive,
+            // service not enabled, etc.) — still return 200 so Cal.com stops retrying
+            const r = result as any
+            if (r && r.success === false) {
+                await adminClient.from('webhook_logs').insert({
+                    product_id: productId,
+                    event_type: triggerEvent,
+                    payload,
+                    status: 'failed',
+                    error_message: r.error || 'Booking rejected',
+                    ip_address: 'calcom-webhook',
+                } as never)
+                return NextResponse.json({ status: 'skipped', message: r.error })
             }
 
             return NextResponse.json({ success: true, result })

@@ -137,6 +137,8 @@ export async function POST(request: NextRequest) {
             category,
             price_inr,
             billing_type,
+            meeting_commission_flat,
+            cal_link,
         } = body
 
         // ---- Required fields ----
@@ -188,6 +190,25 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'price_inr must be a non-negative number (paise)' }, { status: 400 })
         }
 
+        // ---- Service (Cal.com) vertical: flat per-meeting commission + booking link ----
+        if (meeting_commission_flat != null && meeting_commission_flat !== '') {
+            const flat = Number(meeting_commission_flat)
+            if (!Number.isInteger(flat) || flat < 100 || flat > 100_000_000) {
+                return NextResponse.json({ error: 'meeting_commission_flat must be ₹1–₹10,00,000 (in paise)' }, { status: 400 })
+            }
+        }
+        if (cal_link != null && cal_link.trim() !== '') {
+            let calUrl: URL
+            try {
+                calUrl = new URL(cal_link)
+            } catch {
+                return NextResponse.json({ error: 'cal_link is not a valid URL' }, { status: 400 })
+            }
+            if (calUrl.protocol !== 'https:') {
+                return NextResponse.json({ error: 'cal_link must be https' }, { status: 400 })
+            }
+        }
+
         const webhookSecret = crypto.randomBytes(32).toString('hex')
 
         const { data: product, error: insertError } = await supabase
@@ -209,6 +230,10 @@ export async function POST(request: NextRequest) {
                 category: category || 'other',
                 price_inr: price_inr ?? null,
                 billing_type: billing_type || 'subscription',
+                meeting_commission_flat: meeting_commission_flat != null && meeting_commission_flat !== ''
+                    ? Number(meeting_commission_flat)
+                    : null,
+                cal_link: cal_link && cal_link.trim() !== '' ? cal_link.trim() : null,
             } as never)
             .select()
             .single()

@@ -26,7 +26,11 @@ export async function GET(request: Request) {
 
         if (autoConfirmTxs && autoConfirmTxs.length > 0) {
             for (const tx of autoConfirmTxs as any[]) {
-                await supabase.from('transactions').update({ confirmed_by_buyer: true } as never).eq('id', tx.id)
+                await supabase.from('transactions').update({
+                    confirmed_by_buyer: true,
+                    status: 'cleared',
+                    cleared_at: new Date().toISOString(),
+                } as never).eq('id', tx.id)
                 await supabase.rpc('release_cleared_funds' as never, { p_seller_id: tx.seller_id, p_amount: tx.commission_amount } as never)
                 
                 // Notify

@@ -39,6 +39,11 @@ export default function EditProductPage() {
     const [maxCacLimit, setMaxCacLimit] = useState("")
     const [isActive, setIsActive] = useState(true)
     const [autoPaused, setAutoPaused] = useState(false)
+    // Service (Cal.com) + Shopify verticals
+    const [calLink, setCalLink] = useState("")
+    const [meetingCommissionFlat, setMeetingCommissionFlat] = useState("")
+    const [shopifySecret, setShopifySecret] = useState("")
+    const [isSavingShopify, setIsSavingShopify] = useState(false)
 
     const categories = [
         { id: "ai_saas", label: "AI SaaS" },
@@ -56,7 +61,7 @@ export default function EditProductPage() {
             const supabase = createClient()
             const { data, error } = await supabase
                 .from("products")
-                .select("id, name, description, logo_url, website_url, is_active, auto_paused, category, price_inr, billing_type, commission_config, max_cac_limit")
+                .select("id, name, description, logo_url, website_url, is_active, auto_paused, category, price_inr, billing_type, commission_config, max_cac_limit, cal_link, meeting_commission_flat")
                 .eq("id", productId)
                 .eq("founder_id", user.id)
                 .single()
@@ -86,6 +91,11 @@ export default function EditProductPage() {
 
             if (pd.max_cac_limit) {
                 setMaxCacLimit(String(pd.max_cac_limit / 100))
+            }
+
+            if (pd.cal_link) setCalLink(pd.cal_link)
+            if (pd.meeting_commission_flat) {
+                setMeetingCommissionFlat(String(pd.meeting_commission_flat / 100))
             }
 
             setIsLoading(false)
@@ -135,6 +145,10 @@ export default function EditProductPage() {
                     commission_config: commissionConfig,
                     max_cac_limit: maxCac,
                     is_active: isActive,
+                    cal_link: calLink || null,
+                    meeting_commission_flat: meetingCommissionFlat
+                        ? Math.round(parseFloat(meetingCommissionFlat) * 100)
+                        : null,
                 } as never)
                 .eq("id", productId)
 
@@ -169,6 +183,29 @@ export default function EditProductPage() {
             toast.error(err instanceof Error ? err.message : "Failed to rotate")
         } finally {
             setIsRotating(false)
+        }
+    }
+
+    const saveShopifySecret = async () => {
+        if (!shopifySecret.trim()) {
+            toast.error("Enter the Shopify webhook secret first")
+            return
+        }
+        setIsSavingShopify(true)
+        try {
+            const response = await fetch(`/api/products/${productId}/shopify-secret`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ secret: shopifySecret.trim() }),
+            })
+            const data = await response.json()
+            if (!response.ok) throw new Error(data.error || "Failed to save Shopify secret")
+            toast.success("Shopify webhook secret saved!")
+            setShopifySecret("")
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to save Shopify secret")
+        } finally {
+            setIsSavingShopify(false)
         }
     }
 
@@ -367,6 +404,68 @@ export default function EditProductPage() {
                                     min="10" max="100000"
                                 />
                             </div>
+                        </div>
+                    </SpotlightCard>
+
+                    <SpotlightCard className="p-6">
+                        <h3 className="text-lg font-light mb-1">Service / Per-Meeting (Cal.com)</h3>
+                        <p className="text-xs text-muted-foreground mb-4">
+                            Sell consulting or services. Sellers book meetings on your Cal.com link; you pay a flat commission per completed meeting (escrow releases 48h after the meeting).
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2 col-span-2">
+                                <Label htmlFor="cal_link">Cal.com Booking Link</Label>
+                                <Input
+                                    id="cal_link"
+                                    type="url"
+                                    value={calLink}
+                                    onChange={(e) => setCalLink(e.target.value)}
+                                    placeholder="https://cal.com/yourname/consultation"
+                                    className="h-12 bg-input/30"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="meeting_flat">Flat Commission per Meeting (₹)</Label>
+                                <Input
+                                    id="meeting_flat"
+                                    type="number"
+                                    value={meetingCommissionFlat}
+                                    onChange={(e) => setMeetingCommissionFlat(e.target.value)}
+                                    className="h-12 bg-input/30"
+                                    min="1"
+                                />
+                            </div>
+                        </div>
+                    </SpotlightCard>
+
+                    <SpotlightCard className="p-6">
+                        <h3 className="text-lg font-light mb-1">Shopify (Physical Products)</h3>
+                        <p className="text-xs text-muted-foreground mb-4">
+                            Paste your Shopify app's webhook secret here to enable physical-product tracking (14-day escrow).
+                        </p>
+                        <div className="flex items-end gap-3">
+                            <div className="space-y-2 flex-1">
+                                <Label htmlFor="shopify_secret">Shopify HMAC Secret</Label>
+                                <Input
+                                    id="shopify_secret"
+                                    type="password"
+                                    value={shopifySecret}
+                                    onChange={(e) => setShopifySecret(e.target.value)}
+                                    placeholder="shpss_... from your Shopify app"
+                                    className="h-12 bg-input/30"
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={saveShopifySecret}
+                                disabled={isSavingShopify}
+                                className="h-12"
+                            >
+                                {isSavingShopify ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <KeyRound className="w-4 h-4 mr-2" />}
+                                Save Secret
+                            </Button>
                         </div>
                     </SpotlightCard>
 

@@ -91,7 +91,28 @@ export async function GET(request: NextRequest) {
             violations.push(`UNSETTLED QUEUE: ${oldQueued} sales queued >7 days — sellers unpaid, founders unreachable`)
         }
 
-        console.log('[RECONCILE] complete', { violations: violations.length })
+        // ---- Check 5: refresh trust_tier column from live stats ----
+        // The badge endpoint computes tiers on the fly from product_trust_stats;
+        // this keeps the stored column fresh for fast reads (founder dashboard).
+        let tierUpdated = 0
+        try {
+            const { data: stats } = await supabase
+                .from('product_trust_stats' as never)
+                .select('product_id, tier')
+
+            for (const s of (stats as any[]) || []) {
+                if (!s?.product_id) continue
+                const { error: tierErr } = await supabase
+                    .from('products')
+                    .update({ trust_tier: s.tier } as never)
+                    .eq('id', s.product_id)
+                if (!tierErr) tierUpdated++
+            }
+        } catch (tierErr) {
+            console.error('[RECONCILE] trust-tier refresh failed (non-fatal):', tierErr)
+        }
+
+        console.log('[RECONCILE] complete', { violations: violations.length, tiers_refreshed: tierUpdated })
 
         if (violations.length > 0) {
             const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean)

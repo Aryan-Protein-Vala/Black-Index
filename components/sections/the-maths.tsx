@@ -121,6 +121,9 @@ export function TheMathsSection() {
                   <p className="text-xs text-muted-foreground font-light text-center">
                     ₹1 Crore revenue for ₹30 Lakh CAC. Warlords pay the 5% platform fee from their commission.
                   </p>
+                  <p className="text-xs text-muted-foreground font-light text-center">
+                    You pay only on real, webhook-verified sales.
+                  </p>
                   <div className="pt-4 border-t border-border/30 mt-4">
                     <p className="text-sm font-light text-center text-foreground">1,000 salespeople. Zero payroll.</p>
                   </div>

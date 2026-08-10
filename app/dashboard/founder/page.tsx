@@ -34,6 +34,17 @@ const sidebarItems = [
 ]
 
 // ============================================
+// TRUST TIER LABEL (mirrors /api/products/[id]/badge)
+// ============================================
+function tierLabel(product: Product): string {
+    const tier = (product as any).trust_tier ?? 0
+    if (tier === 3) return "Blacklisted"
+    if (tier === 2) return "Trusted"
+    if (tier === 1) return "Certified"
+    return "Not yet certified"
+}
+
+// ============================================
 // OVERVIEW TAB
 // ============================================
 function OverviewTab({ products, transactions, isLoading, fetchError, onRetry }: {
@@ -484,6 +495,19 @@ function ProductsTab({ products, isLoading, onRefresh, fetchError }: { products:
                                             ) : (
                                                 <><AlertCircle className="w-3 h-3" />Paused</>
                                             )}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground font-light">Trust Tier</span>
+                                        <span className={cn(
+                                            "px-2 py-0.5 rounded text-[10px] uppercase tracking-wider border",
+                                            (product as any).trust_tier === 0
+                                                ? "border-border/30 bg-foreground/5 text-muted-foreground"
+                                                : (product as any).trust_tier === 3
+                                                    ? "border-red-500/20 bg-red-500/10 text-red-400"
+                                                    : "border-green-500/20 bg-green-500/10 text-green-400"
+                                        )}>
+                                            {tierLabel(product)}
                                         </span>
                                     </div>
                                 </div>
@@ -946,7 +970,7 @@ export default function FounderDashboard() {
             // SECURITY: Only select non-sensitive fields - webhook_secret must NEVER be returned to client
             const { data: productsData, error: productsError } = await supabase
                 .from("products")
-                .select("id, name, description, logo_url, website_url, is_active, is_founders_choice, is_featured, featured_until, commission_config, max_cac_limit, created_at, settlement_mode, founder_id, webhook_secret")
+                .select("id, name, description, logo_url, website_url, is_active, is_founders_choice, is_featured, featured_until, commission_config, max_cac_limit, created_at, settlement_mode, founder_id, webhook_secret, trust_tier, verified_at")
                 .eq("founder_id", user.id)
                 .order("created_at", { ascending: false })
 

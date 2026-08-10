@@ -27,16 +27,26 @@ export async function GET(request: Request) {
                         .from('blacklist')
                         .select('id')
                         .eq('profile_id', seller.seller_id)
-                        .single()
-                        
+                        .maybeSingle()
+                    
                     if (!existing) {
                         const { data: profile } = await supabase.from('profiles').select('email, full_name, username').eq('id', seller.seller_id).single()
+
+                        // Attach the product with the most disputed meetings for transparency
+                        const { data: disputedTxs } = await supabase
+                            .from('transactions')
+                            .select('products(name)')
+                            .eq('seller_id', seller.seller_id)
+                            .eq('vertical', 'service')
+                            .eq('status', 'disputed')
+                            .limit(1)
+                        const productName = (disputedTxs as any[])?.[0]?.products?.name || null
                         
                         await supabase.from('blacklist').insert({
-                            entity_type: 'seller',
                             profile_id: seller.seller_id,
                             display_name: (profile as any)?.username || (profile as any)?.full_name || 'Seller',
-                            offense_code: 'other',
+                            product_name: productName,
+                            offense_code: 'dispute_rate',
                             note: 'Auto-ban: >30% of meetings disputed/fake',
                             created_by: seller.seller_id // system
                         } as never)

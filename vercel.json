@@ -11,6 +11,14 @@
         {
             "path": "/api/cron/reconcile",
             "schedule": "0 2 * * *"
+        },
+        {
+            "path": "/api/cron/meeting-confirm",
+            "schedule": "0 10 * * *"
+        },
+        {
+            "path": "/api/cron/dispute-guillotine",
+            "schedule": "15 1 * * *"
         }
     ]
 }

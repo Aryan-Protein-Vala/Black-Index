@@ -17,13 +17,21 @@ export interface Product {
     max_cac_limit?: number
     webhook_secret?: string
     settlement_mode?: string
+    verified_at?: string | null
+    auto_paused?: boolean
+    trust_tier?: number // 0=Not yet certified, 1=Certified, 2=Trusted, 3=Suspended/Blacklisted
+    // Service (Cal.com) vertical
+    meeting_commission_flat?: number | null // paise per meeting
+    cal_link?: string | null
+    // Physical (Shopify) vertical
+    shopify_hmac_secret?: string | null
     created_at: string
 }
 
 export interface Transaction {
     id: string
     type: 'sale' | 'refund' | 'payout'
-    status: 'pending' | 'cleared' | 'paid' | 'cancelled'
+    status: 'pending' | 'cleared' | 'paid' | 'cancelled' | 'refunded' | 'failed' | 'disputed'
     product_id: string
     seller_id: string
     link_id?: string
@@ -37,6 +45,14 @@ export interface Transaction {
     charge_schedule_id?: string
     is_recurring?: boolean
     cleared_at?: string
+    refund_of?: string
+    currency?: string
+    amount_minor?: number
+    fx_rate?: number
+    vertical?: 'saas' | 'service' | 'physical'
+    confirmed_by_buyer?: boolean
+    meeting_start_at?: string | null
+    metadata?: Record<string, unknown> | null
     created_at: string
 }
 

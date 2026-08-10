@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     
     const { data: tx } = await supabase
         .from('transactions')
-        .select('id, seller_id, commission_amount, status, confirmed_by_buyer')
+        .select('id, seller_id, commission_amount, status, confirmed_by_buyer, vertical')
         .eq('id', txId)
         .single()
 
@@ -35,9 +35,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!t || t.status !== 'pending' || t.confirmed_by_buyer) {
         return new NextResponse('Transaction already processed', { status: 400 })
     }
+    // Only service-meeting transactions use this confirmation flow
+    if (t.vertical !== 'service') {
+        return new NextResponse('Invalid transaction', { status: 400 })
+    }
 
     if (choice === 'yes') {
-        await supabase.from('transactions').update({ confirmed_by_buyer: true } as never).eq('id', txId)
+        // Mark cleared FIRST so the nightly release-escrow cron can never double-pay
+        await supabase.from('transactions').update({
+            confirmed_by_buyer: true,
+            status: 'cleared',
+            cleared_at: new Date().toISOString(),
+        } as never).eq('id', txId)
         await supabase.rpc('release_cleared_funds' as never, { p_seller_id: t.seller_id, p_amount: t.commission_amount } as never)
         
         await supabase.from('notifications').insert({

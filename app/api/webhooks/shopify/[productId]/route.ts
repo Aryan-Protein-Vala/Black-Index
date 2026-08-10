@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { processRefund } from '@/lib/webhook-processor'
+import { convertMinorToINRPaise } from '@/lib/fx'
 import crypto from 'crypto'
 
 function verifyShopifyHmac(body: string, secret: string, hmac: string): boolean {
@@ -60,32 +61,35 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             const sellerId = (link as any).seller_id
             const buyerEmail = payload.email || payload.customer?.email
             const buyerPhone = payload.phone || payload.customer?.phone
-            const orderId = payload.id.toString()
-            const totalPrice = payload.total_price // e.g. "100.00"
+            const orderId = String(payload.id ?? '')
+            const totalPrice = Number(payload.total_price) // e.g. 100.00 (major units)
             const currency = payload.currency || 'INR'
             
-            const { data: sellerProfile } = await adminClient.from('profiles').select('email, upi_vpa').eq('id', sellerId).single()
+            const { data: sellerProfile } = await adminClient.from('profiles').select('email, phone, upi_vpa').eq('id', sellerId).single()
             const sellerEmail = (sellerProfile as any)?.email
-            const sellerPhone = (sellerProfile as any)?.upi_vpa
+            const sellerPhone = (sellerProfile as any)?.phone
+            const sellerVpa = (sellerProfile as any)?.upi_vpa
+
+            const phoneMatches =
+                (buyerPhone && sellerPhone && buyerPhone === sellerPhone) ||
+                (buyerPhone && sellerVpa && buyerPhone === sellerVpa)
 
             if ((buyerEmail && sellerEmail && buyerEmail.toLowerCase() === sellerEmail.toLowerCase()) ||
-                (buyerPhone && sellerPhone && buyerPhone === sellerPhone)) {
+                phoneMatches) {
                 
                 await adminClient.from('fraud_reports').insert({
-                    product_id: productId, founder_id: p.founder_id, reporter_id: sellerId,
-                    evidence_url: 'system_heuristic', description: 'Self-booking detected based on email/phone match.', status: 'confirmed'
+                    product_id: productId, founder_id: p.founder_id, reporter_id: p.founder_id,
+                    evidence_url: 'system_heuristic', description: 'Self-purchase detected based on email/phone match.', status: 'confirmed'
                 } as never)
 
-                return NextResponse.json({ status: 'flagged', message: 'Self-booking blocked' })
+                return NextResponse.json({ status: 'flagged', message: 'Self-purchase blocked' })
             }
 
-            let amountPaise = 0
-            if (totalPrice) {
-                amountPaise = Math.round(parseFloat(totalPrice) * 100)
-            }
-            
-            // Fx conversion omitted here for brevity if non-INR (spec says via lib/fx but lib/fx.ts is just USD_INR)
-            if (currency === 'USD') amountPaise = amountPaise * 86
+            // CRITICAL FIX: never hardcode FX rates — lib/fx is the single source
+            // (env FX_<CURRENCY>_INR, fallbacks only for USD/EUR/GBP, loud warning otherwise)
+            const amountMinor = Number.isFinite(totalPrice) ? Math.round(totalPrice * 100) : 0 // Shopify sends major units
+            const fx = convertMinorToINRPaise(amountMinor, currency)
+            const amountPaise = fx.amountInPaise
 
             // Check repeat purchases (>3 in 24h)
             const yesterday = new Date(Date.now() - 24*60*60*1000).toISOString()
@@ -108,15 +112,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 p_external_customer_id: buyerEmail || 'unknown@example.com',
                 p_external_transaction_id: orderId,
                 p_amount: amountPaise,
-                p_currency: 'INR',
-                p_amount_minor: amountPaise,
-                p_fx_rate: 1,
+                p_currency: fx.currency,
+                p_amount_minor: amountMinor,
+                p_fx_rate: fx.fxRate,
                 p_escrow_days: 14
             } as never)
 
             if (rpcError) return NextResponse.json({ error: rpcError.message }, { status: 500 })
 
-            await adminClient.from('transactions').update({ vertical: 'physical' } as never).eq('id', (result as any).tx_id)
+            // CRITICAL FIX: parse result.tx_id safely — never assume the RPC succeeded
+            const txId = (result as any)?.transaction_id
+            if (txId) {
+                await adminClient.from('transactions').update({ vertical: 'physical' } as never).eq('id', txId)
+            }
 
             return NextResponse.json({ success: true, result })
         }

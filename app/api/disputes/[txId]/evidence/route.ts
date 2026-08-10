@@ -48,6 +48,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
+        // 10 MB cap — dispute evidence is documents/screenshots, not video
+        const MAX_EVIDENCE_SIZE = 10 * 1024 * 1024
+        if (file.size > MAX_EVIDENCE_SIZE) {
+            return NextResponse.json({ error: 'File too large. Maximum 10MB.' }, { status: 400 })
+        }
+
         const buffer = Buffer.from(await file.arrayBuffer())
         const mimeType = checkMagicBytes(buffer)
         
@@ -63,14 +69,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         if (uploadError) throw uploadError
 
-        const { data: publicUrlData } = adminClient.storage
+        // Bucket is private — store the object path, hand out a 7-day signed URL
+        const { data: signedUrlData, error: signedError } = await adminClient.storage
             .from('dispute-evidence')
-            .getPublicUrl(fileName)
+            .createSignedUrl(fileName, 60 * 60 * 24 * 7)
+
+        if (signedError) throw signedError
 
         await adminClient.from('dispute_evidence').insert({
             transaction_id: txId,
             uploaded_by: user.id,
-            file_url: publicUrlData.publicUrl,
+            file_url: fileName,
             note
         } as never)
 
@@ -84,7 +93,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             read: false
         } as never)
 
-        return NextResponse.json({ success: true, url: publicUrlData.publicUrl })
+        return NextResponse.json({ success: true, url: signedUrlData?.signedUrl || null, path: fileName })
     } catch (error) {
         console.error('Evidence upload error:', error)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

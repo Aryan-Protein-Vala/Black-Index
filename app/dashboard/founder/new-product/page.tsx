@@ -49,6 +49,9 @@ export default function NewProductPage() {
     const [recurringPct, setRecurringPct] = useState("0")
     const [maxRecurringMonths, setMaxRecurringMonths] = useState("12")
     const [maxCacLimit, setMaxCacLimit] = useState("")
+    // Service (Cal.com) vertical
+    const [calLink, setCalLink] = useState("")
+    const [meetingCommissionFlat, setMeetingCommissionFlat] = useState("")
 
     const categories = [
         { id: "ai_saas", label: "AI SaaS" },
@@ -124,6 +127,10 @@ export default function NewProductPage() {
                         max_recurring_months: billingType === "subscription" ? parseInt(maxRecurringMonths) : 1,
                     },
                     max_cac_limit: maxCacLimit ? parseInt(maxCacLimit) * 100 : null,
+                    meeting_commission_flat: meetingCommissionFlat
+                        ? Math.round(parseFloat(meetingCommissionFlat) * 100)
+                        : null,
+                    cal_link: calLink || null,
                 })
             })
 
@@ -334,6 +341,44 @@ export default function NewProductPage() {
                                     </span>
                                 </p>
                             </div>
+                        </div>
+
+                        {/* Service / per-meeting (Cal.com) — optional */}
+                        <div className="space-y-4 pt-4 border-t border-border/50">
+                            <h3 className="font-medium">Service / Per-Meeting (Cal.com) — Optional</h3>
+                            <p className="text-xs text-muted-foreground">
+                                Sell consulting, demos or services. Sellers book meetings on your Cal.com link and you pay a flat commission per completed meeting. Leave empty if this is a pure SaaS product.
+                            </p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2 col-span-2">
+                                    <Label htmlFor="cal_link">Cal.com Booking Link</Label>
+                                    <Input
+                                        id="cal_link"
+                                        type="url"
+                                        value={calLink}
+                                        onChange={(e) => setCalLink(e.target.value)}
+                                        placeholder="https://cal.com/yourname/consultation"
+                                        className="h-12 bg-input/30"
+                                    />
+                                </div>
+                                <div className="space-y-2 col-span-2 sm:col-span-1">
+                                    <Label htmlFor="meeting_flat">Flat Commission per Meeting (₹)</Label>
+                                    <Input
+                                        id="meeting_flat"
+                                        type="number"
+                                        min="1"
+                                        value={meetingCommissionFlat}
+                                        onChange={(e) => setMeetingCommissionFlat(e.target.value)}
+                                        placeholder="e.g. 500"
+                                        className="h-12 bg-input/30"
+                                    />
+                                </div>
+                            </div>
+                            {calLink && meetingCommissionFlat && (
+                                <p className="text-xs text-muted-foreground">
+                                    Warlords earn <strong>₹{meetingCommissionFlat}</strong> per completed meeting (you pay that + 5% of it as fee).
+                                </p>
+                            )}
                         </div>
                     </div>
                     

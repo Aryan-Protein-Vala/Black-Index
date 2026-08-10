@@ -62,9 +62,22 @@ export function useLinks() {
                 setIsLoading(false)
             }
         }
-
         fetchLinks()
     }, [])
+
+    const refreshLinks = async () => {
+        setIsLoading(true)
+        try {
+            const response = await fetch('/api/links/generate')
+            const data = await response.json()
+            if (!response.ok) throw new Error(data.error || 'Failed to fetch links')
+            setLinks(data.links)
+        } catch (err) {
+            setError(err as Error)
+        } finally {
+            setIsLoading(false)
+        }
+    }
 
     const generateLink = async (productId: string, customSlug?: string) => {
         const response = await fetch('/api/links/generate', {
@@ -85,7 +98,7 @@ export function useLinks() {
         return data
     }
 
-    return { links, isLoading, error, generateLink }
+    return { links, isLoading, error, generateLink, refreshLinks }
 }
 
 // Hook to fetch user's transactions with realtime updates

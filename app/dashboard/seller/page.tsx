@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
     LayoutDashboard, Link2, Vault, TrendingUp, Settings,
     Copy, Check, ArrowUpRight, LogOut, Package, Plus, Loader2,
-    ExternalLink, Crown, Flag, AlertCircle, Wallet
+    ExternalLink, Crown, Flag, AlertCircle, Wallet, Trash2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -213,7 +213,8 @@ function OverviewTab({ stats, transactions }: { stats: ReturnType<typeof useDash
 // MY LINKS TAB
 // ============================================
 function LinksTab({ copiedStates, handleCopy }: { copiedStates: Record<string, boolean>; handleCopy: (text: string, id: string) => void }) {
-    const { links, isLoading } = useLinks()
+    const { links, isLoading, refreshLinks } = useLinks()
+    const [isDeleting, setIsDeleting] = useState<string | null>(null)
     const [isFraudModalOpen, setIsFraudModalOpen] = useState(false)
     const [selectedLink, setSelectedLink] = useState<{id: string, name: string} | null>(null)
     const [fraudUrl, setFraudUrl] = useState("")
@@ -268,6 +269,27 @@ function LinksTab({ copiedStates, handleCopy }: { copiedStates: Record<string, b
             import("sonner").then(m => m.toast.error(err.message))
         } finally {
             setIsSubmittingFraud(false)
+        }
+    }
+
+    const handleDeleteLink = async (linkId: string) => {
+        const confirmed = confirm("Are you sure you want to delete this link?")
+        if (!confirmed) return
+        
+        setIsDeleting(linkId)
+        try {
+            const res = await fetch(`/api/links/${linkId}`, {
+                method: 'DELETE'
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || "Failed to delete link")
+            
+            import("sonner").then(m => m.toast.success("Link deleted successfully"))
+            await refreshLinks()
+        } catch (err: any) {
+            import("sonner").then(m => m.toast.error(err.message))
+        } finally {
+            setIsDeleting(null)
         }
     }
 
@@ -329,6 +351,18 @@ function LinksTab({ copiedStates, handleCopy }: { copiedStates: Record<string, b
                                             title="Report Scam Checkout"
                                         >
                                             <Flag className="w-4 h-4 text-muted-foreground group-hover:text-red-400 transition-colors" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteLink(link.id)}
+                                            disabled={isDeleting === link.id}
+                                            className="p-2 rounded-lg hover:bg-red-500/10 transition-all group disabled:opacity-50"
+                                            title="Delete Link"
+                                        >
+                                            {isDeleting === link.id ? (
+                                                <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+                                            ) : (
+                                                <Trash2 className="w-4 h-4 text-muted-foreground group-hover:text-red-400 transition-colors" />
+                                            )}
                                         </button>
                                     </div>
                                 </motion.div>

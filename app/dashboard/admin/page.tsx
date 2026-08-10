@@ -1035,6 +1035,36 @@ function UsersSection({ users, searchQuery, actionId, runAction, showConfirm }: 
                                 </Button>
                             </div>
                         </div>
+
+                        {/* Danger Zone */}
+                        <div className="mt-8 pt-6 border-t border-border/30">
+                            <p className="text-xs text-red-500/80 mb-2 font-medium">Danger Zone</p>
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="w-full bg-red-500/5 text-red-500 border-red-500/20 hover:bg-red-500/10 hover:text-red-400"
+                                onClick={async () => {
+                                    const confirmed = await showConfirm({
+                                        title: "Blacklist User",
+                                        message: `Are you sure you want to permanently blacklist ${selectedUser.full_name || selectedUser.email}?`,
+                                        confirmText: "Blacklist",
+                                        cancelText: "Cancel",
+                                        type: "danger"
+                                    })
+                                    if (confirmed) {
+                                        await runAction('/api/admin/blacklist', {
+                                            action: 'add',
+                                            profile_id: selectedUser.id,
+                                            display_name: selectedUser.full_name || selectedUser.email,
+                                            offense_code: 'other',
+                                            note: 'Manually blocked by admin from Users tab'
+                                        }, 'User blacklisted')
+                                    }
+                                }}
+                            >
+                                Blacklist / Block User
+                            </Button>
+                        </div>
                     </SpotlightCard>
                 ) : (
                     <SpotlightCard className="p-6 h-fit text-center text-muted-foreground font-light text-sm">

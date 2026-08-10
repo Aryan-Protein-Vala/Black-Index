@@ -136,10 +136,10 @@ export function SetupBilling() {
                     <MapPin className="w-4 h-4" /> India (INR)
                 </button>
                 <button 
-                    onClick={() => setRegion('international')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${region === 'international' ? 'bg-background shadow text-foreground' : 'text-muted-foreground'}`}
+                    disabled
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all opacity-50 cursor-not-allowed text-muted-foreground"
                 >
-                    <Globe className="w-4 h-4" /> Global (USD)
+                    <Globe className="w-4 h-4" /> Global (USD) <span className="text-[10px] ml-1 bg-foreground/10 px-2 py-0.5 rounded">Soon will be available for the world!!!</span>
                 </button>
             </div>
 

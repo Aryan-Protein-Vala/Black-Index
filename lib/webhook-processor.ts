@@ -420,9 +420,10 @@ export async function processRefund(data: RefundData): Promise<ProcessResult> {
             .select('pending_balance')
             .eq('id', sale.seller_id)
             .single()
+        const currentPending = (seller as any)?.pending_balance || 0
         await supabase
             .from('profiles')
-            .update({ pending_balance: (seller as any)?.pending_balance - net } as never)
+            .update({ pending_balance: currentPending - net } as never)
             .eq('id', sale.seller_id)
 
         // Re-credit founder wallet

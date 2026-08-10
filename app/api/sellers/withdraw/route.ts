@@ -69,21 +69,23 @@ export async function POST(request: NextRequest) {
             }, { status: 400 })
         }
 
+        if (!idempotencyKey) {
+            return NextResponse.json({ error: 'Idempotency-Key header is required' }, { status: 400 })
+        }
+
         // Idempotency: this exact request already processed?
-        const wdRef = idempotencyKey ? `wd:${user.id}:${idempotencyKey}` : null
-        if (wdRef) {
-            const { data: existing } = await adminClient
-                .from('transactions')
-                .select('id, provider_payout_id, created_at')
-                .eq('external_transaction_id', wdRef)
-                .maybeSingle()
-            if (existing) {
-                return NextResponse.json({
-                    error: 'This withdrawal was already submitted',
-                    transaction_id: (existing as any).id,
-                    payout_id: (existing as any).provider_payout_id,
-                }, { status: 409 })
-            }
+        const wdRef = `wd:${user.id}:${idempotencyKey}`
+        const { data: existing } = await adminClient
+            .from('transactions')
+            .select('id, provider_payout_id, created_at')
+            .eq('external_transaction_id', wdRef)
+            .maybeSingle()
+        if (existing) {
+            return NextResponse.json({
+                error: 'This withdrawal was already submitted',
+                transaction_id: (existing as any).id,
+                payout_id: (existing as any).provider_payout_id,
+            }, { status: 409 })
         }
 
         // Get or create fund account

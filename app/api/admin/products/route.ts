@@ -95,6 +95,39 @@ export async function POST(request: NextRequest) {
                 })
             }
 
+            case 'certify': {
+                // Manual certification: proves the money pipe (used when a
+                // founder verified via an offline/manual proof, or a webhook
+                // sale predates verified_at). Sets verified_at so the product
+                // appears in the public Vault.
+                const { data: productRow } = await supabase
+                    .from('products')
+                    .select('id, name, verified_at')
+                    .eq('id', productId)
+                    .single()
+                const pr = productRow as any
+
+                if (pr?.verified_at) {
+                    return NextResponse.json({
+                        success: true,
+                        message: 'Product already certified',
+                        verified_at: pr.verified_at,
+                    })
+                }
+
+                const { error } = await supabase
+                    .from('products')
+                    .update({ verified_at: new Date().toISOString(), is_active: true, auto_paused: false } as never)
+                    .eq('id', productId)
+
+                if (error) throw error
+
+                return NextResponse.json({
+                    success: true,
+                    message: `Product "${typedProduct.name}" certified — now visible in the Vault`
+                })
+            }
+
             default:
                 return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
         }

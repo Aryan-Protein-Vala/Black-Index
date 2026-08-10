@@ -21,6 +21,7 @@ import { WithdrawFunds } from "@/components/seller/withdraw-funds"
 import { SellerWalletBalance } from "@/components/seller/seller-wallet-balance"
 import { NotificationsBell } from "@/components/notifications-bell"
 import { ProductTour } from "@/components/product-tour"
+import { useConfirm } from "@/components/confirm-provider"
 
 // Tab configuration
 const sidebarItems = [
@@ -214,6 +215,7 @@ function OverviewTab({ stats, transactions }: { stats: ReturnType<typeof useDash
 // ============================================
 function LinksTab({ copiedStates, handleCopy }: { copiedStates: Record<string, boolean>; handleCopy: (text: string, id: string) => void }) {
     const { links, isLoading, refreshLinks } = useLinks()
+    const { showConfirm } = useConfirm()
     const [isDeleting, setIsDeleting] = useState<string | null>(null)
     const [isFraudModalOpen, setIsFraudModalOpen] = useState(false)
     const [selectedLink, setSelectedLink] = useState<{id: string, name: string} | null>(null)
@@ -273,7 +275,13 @@ function LinksTab({ copiedStates, handleCopy }: { copiedStates: Record<string, b
     }
 
     const handleDeleteLink = async (linkId: string) => {
-        const confirmed = confirm("Are you sure you want to delete this link?")
+        const confirmed = await showConfirm({
+            title: "Delete Link",
+            message: "Are you sure you want to permanently delete this link?",
+            confirmText: "Delete",
+            cancelText: "Cancel",
+            type: "danger"
+        })
         if (!confirmed) return
         
         setIsDeleting(linkId)

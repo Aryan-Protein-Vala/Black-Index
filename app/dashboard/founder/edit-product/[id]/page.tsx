@@ -467,7 +467,7 @@ export default function EditProductPage() {
                     <SpotlightCard className="p-6">
                         <h3 className="text-lg font-light mb-1">Provider Webhook Secret</h3>
                         <p className="text-xs text-muted-foreground mb-4">
-                            For Razorpay / Lemon Squeezy: keep the secret shown at creation. For Stripe: paste Stripe&apos;s endpoint signing secret (<code className="text-xs bg-muted/50 px-1 rounded">whsec_...</code>) here — Stripe generates its own, so it must be set this way.
+                            For Razorpay / Lemon Squeezy / Shopflo: keep the secret shown at creation. For Stripe: paste Stripe&apos;s endpoint signing secret (<code className="text-xs bg-muted/50 px-1 rounded">whsec_...</code>) here — Stripe generates its own, so it must be set this way.
                         </p>
                         <div className="flex items-end gap-3">
                             <div className="space-y-2 flex-1">

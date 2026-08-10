@@ -248,6 +248,23 @@ function ProductsTab({ products, isLoading, onRefresh, fetchError }: { products:
     const [featuringId, setFeaturingId] = useState<string | null>(null)
     const [webhookProduct, setWebhookProduct] = useState<Product | null>(null)
     const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+    const [selectedProvider, setSelectedProvider] = useState<string>('razorpay')
+
+    const getSecretInstructions = (provider: string) => {
+        switch (provider) {
+            case 'stripe': return 'Paste Stripe\'s endpoint signing secret (whsec_...) here.'
+            case 'phonepe': return 'Paste your PhonePe Salt Key here.'
+            case 'payu': return 'Paste your PayU Salt here.'
+            case 'instamojo': return 'Paste your Instamojo Private Salt here.'
+            case 'ccavenue': return 'Paste your CCAvenue Working Key here.'
+            case 'cashfree':
+            case 'razorpay':
+            case 'shopflo':
+            case 'lemonsqueezy':
+            default:
+                return 'Keep the secret generated at creation (or paste your API Secret if applicable).'
+        }
+    }
     const [testingWebhook, setTestingWebhook] = useState(false)
     const [webhookTestResult, setWebhookTestResult] = useState<{ success: boolean; message: string } | null>(null)
 
@@ -649,6 +666,28 @@ function ProductsTab({ products, isLoading, onRefresh, fetchError }: { products:
 
                                  {/* ID & Secrets Section */}
                                 <div className="space-y-4 mb-8">
+                                    {/* Provider Selection */}
+                                    <div className="p-4 rounded-lg border border-border/30 bg-foreground/5">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-xs font-medium text-muted-foreground uppercase opacity-60">Payment Provider</h4>
+                                        </div>
+                                        <select 
+                                            value={selectedProvider} 
+                                            onChange={(e) => setSelectedProvider(e.target.value)}
+                                            className="w-full bg-black/50 border border-border/20 rounded-lg p-2.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-blue-500"
+                                        >
+                                            <option value="razorpay">Razorpay</option>
+                                            <option value="stripe">Stripe</option>
+                                            <option value="shopflo">Shopflo</option>
+                                            <option value="cashfree">Cashfree</option>
+                                            <option value="phonepe">PhonePe</option>
+                                            <option value="payu">PayU</option>
+                                            <option value="instamojo">Instamojo</option>
+                                            <option value="ccavenue">CCAvenue</option>
+                                            <option value="lemonsqueezy">Lemon Squeezy</option>
+                                        </select>
+                                    </div>
+
                                     {/* Product ID */}
                                     <div className="p-4 rounded-lg border border-border/30 bg-foreground/5">
                                         <div className="flex items-center justify-between mb-2">
@@ -684,6 +723,7 @@ function ProductsTab({ products, isLoading, onRefresh, fetchError }: { products:
                                         <div className="flex items-center justify-between mb-2">
                                             <h4 className="text-xs font-medium text-yellow-500 uppercase opacity-80">Webhook Signing Secret</h4>
                                         </div>
+                                        <p className="text-[10px] text-yellow-500/70 mb-2">{getSecretInstructions(selectedProvider)}</p>
                                         <div className="flex gap-2">
                                             <input
                                                 type="text"
@@ -713,17 +753,17 @@ function ProductsTab({ products, isLoading, onRefresh, fetchError }: { products:
                                     <div className="p-4 rounded-lg border border-blue-500/20 bg-blue-500/5">
                                         <div className="flex items-center justify-between mb-2">
                                             <h4 className="text-xs font-medium text-blue-400 uppercase opacity-80">Webhook URL</h4>
-                                            <span className="text-[10px] text-blue-400/60 font-mono">Replace &lt;provider&gt; with razorpay, stripe, or shopflo</span>
+                                            <span className="text-[10px] text-blue-400/60 font-mono">Paste this into {selectedProvider}</span>
                                         </div>
                                         <div className="flex gap-2">
                                             <input
                                                 type="text"
                                                 readOnly
-                                                value={`https://blackindex.in/api/webhooks/<provider>/${webhookProduct.id}`}
+                                                value={`https://blackindex.in/api/webhooks/${selectedProvider}/${webhookProduct.id}`}
                                                 className="flex-1 px-3 py-2 text-xs bg-black/30 border border-blue-500/20 rounded-lg font-mono text-blue-400/90"
                                             />
                                             <button
-                                                onClick={() => handleCopyUrl(`https://blackindex.in/api/webhooks/<provider>/${webhookProduct.id}`, 'webhookurl')}
+                                                onClick={() => handleCopyUrl(`https://blackindex.in/api/webhooks/${selectedProvider}/${webhookProduct.id}`, 'webhookurl')}
                                                 className={cn(
                                                     "px-3 py-2 rounded-lg border transition-all text-xs",
                                                     copiedUrl === 'webhookurl'

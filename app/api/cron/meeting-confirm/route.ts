@@ -44,7 +44,7 @@ export async function GET(request: Request) {
         const nowStr = new Date().toISOString()
         const { data: requireConfirmTxs } = await supabase
             .from('transactions')
-            .select('id, external_customer_id, products(name)')
+            .select('id, external_customer_id, metadata, products(name)')
             .eq('vertical', 'service')
             .eq('status', 'pending')
             .eq('confirmed_by_buyer', false)

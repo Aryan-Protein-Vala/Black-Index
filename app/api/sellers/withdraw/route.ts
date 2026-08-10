@@ -127,27 +127,18 @@ export async function POST(request: NextRequest) {
                 .eq('id', user.id)
         }
 
-        // STEP 1: Atomically deduct BEFORE payout (prevents double-spend)
-        const { error: rpcError } = await adminClient.rpc('process_payout' as never, {
+        // STEP 1: Atomically deduct balance AND create 'processing' transaction
+        const txExternalId = wdRef || `wd:${user.id}:${Date.now()}`
+        const { data: transactionId, error: rpcError } = await adminClient.rpc('initiate_withdrawal_atomic' as never, {
             p_seller_id: user.id,
             p_amount: amount,
+            p_external_tx_id: txExternalId
         } as never)
 
         if (rpcError) {
-            // Fallback: guarded direct deduction
-            const { error: deductError } = await adminClient
-                .from('profiles')
-                .update({
-                    withdrawable_balance: profileData.withdrawable_balance - amount,
-                } as never)
-                .eq('id', user.id)
-                .gte('withdrawable_balance', amount)
-
-            if (deductError) {
-                return NextResponse.json({
-                    error: 'Withdrawal failed — balance may have changed',
-                }, { status: 409 })
-            }
+            return NextResponse.json({
+                error: 'Withdrawal failed — insufficient balance or processing error',
+            }, { status: 409 })
         }
 
         // STEP 2: Create payout via RazorpayX
@@ -157,50 +148,40 @@ export async function POST(request: NextRequest) {
                 fundAccountId,
                 amount,
                 purpose: 'payout',
-                referenceId: `withdrawal_${user.id}_${Date.now()}`,
+                referenceId: txExternalId, // Tie directly to our internal ref
             })
         } catch (payoutError) {
             console.error('Payout creation failed, restoring balance:', payoutError)
-            const { data: current } = await adminClient
-                .from('profiles')
-                .select('withdrawable_balance')
-                .eq('id', user.id)
-                .single()
+            
+            // Restore balance and mark transaction as failed
+            await adminClient.rpc('process_payout', {
+                p_seller_id: user.id,
+                p_amount: -amount // process_payout subtracts, so negative restores it
+            })
+
             await adminClient
-                .from('profiles')
-                .update({
-                    withdrawable_balance: ((current as any)?.withdrawable_balance || 0) + amount,
-                } as never)
-                .eq('id', user.id)
+                .from('transactions')
+                .update({ status: 'failed' } as never)
+                .eq('id', transactionId as string)
 
             return NextResponse.json({
                 error: 'Payout creation failed. Balance has been restored.',
             }, { status: 500 })
         }
 
-        // STEP 3: Transaction record (idempotent via external_transaction_id)
-        const txExternalId = wdRef || `wd:${user.id}:${payout.id}`
-        const { error: txError } = await adminClient
+        // STEP 3: Update transaction to 'paid' with provider info
+        const { error: txUpdateError } = await adminClient
             .from('transactions')
-            .insert({
-                type: 'payout',
+            .update({
                 status: 'paid',
-                seller_id: user.id,
-                sale_amount: amount,
-                commission_amount: amount,
-                platform_fee: 0,
-                external_transaction_id: txExternalId,
                 provider_payout_id: payout.id,
             } as never)
+            .eq('id', transactionId as string)
 
-        if (txError) {
-            // Unique violation means an idempotent retry raced us — that's fine
-            if (txError.code === '23505') {
-                return NextResponse.json({
-                    error: 'This withdrawal was already submitted',
-                }, { status: 409 })
-            }
-            console.error('Failed to record payout tx:', txError)
+        if (txUpdateError) {
+            console.error('Failed to update transaction after successful payout', txUpdateError)
+            // We don't return error here because the payout actually succeeded. 
+            // The RazorpayX webhook will eventually true it up if needed.
         }
 
         // STEP 4: Confirmation email (template existed; was never wired)

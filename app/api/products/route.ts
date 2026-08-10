@@ -243,9 +243,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: `Failed to create product: ${insertError.message}` }, { status: 500 })
         }
 
+        // The 'enforce_product_defaults' Postgres trigger overwrites the webhook_secret on insert
+        // We MUST return the database-generated secret, not our local one.
+        const actualWebhookSecret = product.webhook_secret || webhookSecret
+
         return NextResponse.json({
             product,
-            webhook_secret: webhookSecret,
+            webhook_secret: actualWebhookSecret,
             message: 'Product created. Save your webhook secret — it will not be shown again (use rotate-secret if lost).',
         }, { status: 201 })
 

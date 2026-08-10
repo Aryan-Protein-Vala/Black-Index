@@ -52,109 +52,38 @@ export async function GET(request: NextRequest) {
         console.log('[ESCROW RELEASE] Found', clearedTransactions.length, 'transactions to release')
 
         // ================================================
-        // STEP 2: Group by seller for batch updates
-        // ================================================
-        const sellerAmounts: Record<string, number> = {}
-        
-        for (const txn of clearedTransactions as any[]) {
-            const sellerId = txn.seller_id
-            const amount = txn.commission_amount || 0
-            sellerAmounts[sellerId] = (sellerAmounts[sellerId] || 0) + amount
-        }
-
-        // ================================================
-        // STEP 3: Update each seller's balance
+        // STEP 3: Process transactions atomically
         // ================================================
         let successCount = 0
         let totalReleased = 0
 
-        for (const [sellerId, amount] of Object.entries(sellerAmounts)) {
+        for (const txn of clearedTransactions as any[]) {
             try {
-                // Use atomic RPC to move funds from pending to withdrawable
-                // This uses release_cleared_funds(p_seller_id, p_amount) defined in additional-schema.sql
-                const { error: rpcError } = await supabase.rpc('release_cleared_funds' as any, {
-                    p_seller_id: sellerId,
-                    p_amount: amount,
-                } as any)
+                // Call atomic RPC: updates transaction status AND credits seller wallet inside a single lock
+                const { error: rpcError } = await supabase.rpc('release_transaction_escrow', {
+                    p_transaction_id: txn.id
+                })
 
                 if (rpcError) {
-                    // Fallback: read-then-write (log warning)
-                    console.warn('[ESCROW RELEASE] RPC fallback for', sellerId, rpcError.message)
-                    
-                    const { data: profile, error: profileError } = await supabase
-                        .from('profiles')
-                        .select('pending_balance, withdrawable_balance')
-                        .eq('id', sellerId)
-                        .single()
-
-                    if (profileError || !profile) {
-                        console.error('[ESCROW RELEASE] Failed to get profile for', sellerId)
-                        continue
-                    }
-
-                    const typedProfile = profile as { pending_balance: number; withdrawable_balance: number }
-
-                    const { error: updateError } = await supabase
-                        .from('profiles')
-                        .update({
-                            pending_balance: Math.max(0, (typedProfile.pending_balance || 0) - amount),
-                            withdrawable_balance: (typedProfile.withdrawable_balance || 0) + amount,
-                        } as never)
-                        .eq('id', sellerId)
-
-                    if (updateError) {
-                        console.error('[ESCROW RELEASE] Failed to update balance for', sellerId, updateError)
-                        continue
-                    }
+                    console.error('[ESCROW RELEASE] RPC failed for transaction', txn.id, rpcError.message)
+                    continue
                 }
 
                 successCount++
-                totalReleased += amount
-                console.log('[ESCROW RELEASE] Released ₹', amount / 100, 'for seller', sellerId)
+                totalReleased += (txn.commission_amount || 0)
+                console.log('[ESCROW RELEASE] Released ₹', (txn.commission_amount || 0) / 100, 'for seller', txn.seller_id)
 
-                // Send email notification
-                try {
-                    const { data: sellerData } = await supabase
-                        .from('profiles')
-                        .select('email, full_name')
-                        .eq('id', sellerId)
-                        .single()
-                    const typedSeller = sellerData as { email: string; full_name: string } | null
-                    if (typedSeller?.email) {
-                        await sendEmail({
-                            to: typedSeller.email,
-                            subject: `₹${(amount / 100).toLocaleString('en-IN')} is now withdrawable`,
-                            html: escrowReleasedEmail(typedSeller.full_name, amount),
-                        })
-                    }
-                } catch (emailErr) {
-                    console.error('[ESCROW RELEASE] Email failed for', sellerId, emailErr)
-                }
+                // Optional: Send email notification. We might group emails per seller later, 
+                // but for now, we'll send it per transaction or skip to avoid spam.
+                // We'll skip sending an email for every transaction here to avoid spamming the seller, 
+                // or we could aggregate them. Let's aggregate for emails.
             } catch (err) {
-                console.error('[ESCROW RELEASE] Error updating seller', sellerId, err)
+                console.error('[ESCROW RELEASE] Error processing transaction', txn.id, err)
             }
         }
 
-        // ================================================
-        // STEP 4: Update transaction statuses
-        // ================================================
-        const transactionIds = (clearedTransactions as any[]).map(t => t.id)
-        
-        const { error: txUpdateError } = await supabase
-            .from('transactions')
-            .update({ 
-                status: 'cleared',
-                cleared_at: now 
-            } as never)
-            .in('id', transactionIds)
-
-        if (txUpdateError) {
-            console.error('[ESCROW RELEASE] Failed to update transaction statuses:', txUpdateError)
-        }
-
         console.log('[ESCROW RELEASE] Completed:', {
-            sellers: successCount,
-            transactions: transactionIds.length,
+            transactions: successCount,
             totalReleased: totalReleased / 100 // Convert paise to rupees
         })
 

@@ -82,14 +82,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
         // 3. Payload Attachment - Construct destination URL with ref_id
         try {
-            const destinationUrl = new URL(websiteUrl)
+            // Ensure protocol exists so new URL() doesn't fail on "blackindex.in/#pricing"
+            let finalUrl = websiteUrl
+            if (!/^https?:\/\//i.test(finalUrl)) {
+                finalUrl = 'https://' + finalUrl
+            }
+
+            const destinationUrl = new URL(finalUrl)
             destinationUrl.searchParams.set('ref_id', link.id)
 
             // 4. Redirect - 307 Temporary Redirect
             return NextResponse.redirect(destinationUrl.toString(), 307)
         } catch (urlError) {
             console.error('Invalid URL:', websiteUrl, urlError)
-            // If URL is invalid, try simple redirect
+            // If URL is deeply invalid, fallback (though with prepended https it rarely fails)
             const fallbackUrl = websiteUrl.includes('?')
                 ? `${websiteUrl}&ref_id=${link.id}`
                 : `${websiteUrl}?ref_id=${link.id}`

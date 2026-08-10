@@ -62,46 +62,17 @@ export async function POST(request: NextRequest) {
 
     const depositAmount = typedDeposit.amount
 
-    // Credit wallet using atomic SQL increment (wallet_balance = wallet_balance + amount)
-    // This avoids read-then-write race conditions
-    const { error: creditError } = await supabase.rpc('credit_wallet' as any, {
-        p_user_id: verifiedUserId,
-        p_amount: depositAmount,
-    } as any)
+    // Credit wallet using atomic SQL increment and mark deposit completed in one transaction
+    // This avoids read-then-write race conditions and double-crediting
+    const { error: creditError } = await supabase.rpc('credit_founder_wallet_atomic', {
+        p_deposit_id: typedDeposit.id,
+        p_payment_id: razorpay_payment_id,
+    })
 
     if (creditError) {
-        // Fallback if RPC doesn't exist: read-then-write (acceptable for low-volume founder deposits)
-        console.warn('[WALLET VERIFY] credit_wallet RPC not found, using fallback:', creditError.message)
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('wallet_balance')
-            .eq('id', verifiedUserId)
-            .single()
-
-        const currentBalance = ((profile as any)?.wallet_balance as number) || 0
-
-        const { error: updateError } = await supabase
-            .from('profiles')
-            .update({
-                wallet_balance: currentBalance + depositAmount,
-            } as never)
-            .eq('id', verifiedUserId)
-
-        if (updateError) {
-            console.error('Failed to credit wallet:', updateError)
-            return NextResponse.json({ error: 'Failed to credit wallet' }, { status: 500 })
-        }
+        console.error('Failed to credit wallet via RPC:', creditError)
+        return NextResponse.json({ error: 'Failed to credit wallet' }, { status: 500 })
     }
-
-    // Update deposit record (mark as completed to prevent double-crediting)
-    await supabase
-        .from('founder_deposits')
-        .update({
-            status: 'completed',
-            payment_id: razorpay_payment_id,
-        } as never)
-        .eq('order_id', razorpay_order_id)
-        .eq('founder_id', verifiedUserId)
 
     // Settle queued sales: sellers who earned commissions while the wallet
     // was empty get paid now, and auto-paused products resume automatically.

@@ -83,6 +83,7 @@ create table if not exists public.blacklist (
 alter table public.blacklist enable row level security;
 
 -- Public transparency page: name + product + offense + date ONLY.
+drop policy if exists "Blacklist is public transparency data" on public.blacklist;
 create policy "Blacklist is public transparency data"
   on public.blacklist for select
   to anon, authenticated
@@ -404,11 +405,13 @@ create table if not exists public.dispute_evidence (
 
 alter table public.dispute_evidence enable row level security;
 
+drop policy if exists "Uploader can view own evidence" on public.dispute_evidence;
 create policy "Uploader can view own evidence"
   on public.dispute_evidence for select
   to authenticated
   using (uploaded_by = auth.uid());
 
+drop policy if exists "Founder can view tx evidence" on public.dispute_evidence;
 create policy "Founder can view tx evidence"
   on public.dispute_evidence for select
   to authenticated
@@ -420,6 +423,7 @@ create policy "Founder can view tx evidence"
     )
   );
 
+drop policy if exists "Seller can view tx evidence" on public.dispute_evidence;
 create policy "Seller can view tx evidence"
   on public.dispute_evidence for select
   to authenticated
@@ -430,6 +434,7 @@ create policy "Seller can view tx evidence"
     )
   );
 
+drop policy if exists "Uploader can insert evidence" on public.dispute_evidence;
 create policy "Uploader can insert evidence"
   on public.dispute_evidence for insert
   to authenticated

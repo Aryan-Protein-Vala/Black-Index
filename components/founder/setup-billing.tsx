@@ -164,7 +164,7 @@ export function SetupBilling() {
                         </p>
                         {walletBalance < 50000 && (
                             <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" /> Low balance warning: products auto-pause below ₹500
+                                <AlertCircle className="w-3 h-3" /> Low balance warning: products auto-pause if balance falls below their max commission
                             </p>
                         )}
                     </div>
@@ -175,7 +175,7 @@ export function SetupBilling() {
                         <Input
                             id="topup-amount"
                             type="number"
-                            min={region === 'india' ? 1000 : 12}
+                            min={0}
                             max={region === 'india' ? 500000 : 5000}
                             step={region === 'india' ? 100 : 1}
                             value={topupAmount}
@@ -183,7 +183,7 @@ export function SetupBilling() {
                             className="h-11 bg-input/30"
                         />
                         <p className="text-[10px] text-muted-foreground">
-                            Min {region === 'india' ? '₹1,000' : '$12'} · Max {region === 'india' ? '₹5,00,000' : '$5,000'}
+                            Min {region === 'india' ? '₹0' : '$0'} · Max {region === 'india' ? '₹5,00,000' : '$5,000'}
                         </p>
                     </div>
                     <Button onClick={handleDepositWallet} disabled={isDepositingWallet} className="w-full bg-emerald-500 text-black hover:bg-emerald-600">

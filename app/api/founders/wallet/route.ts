@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
     // If USD, generate Lemon Squeezy Checkout
     if (currency === 'USD') {
         const lsAmountUsd = Number(amount) || 120
-        if (!Number.isFinite(lsAmountUsd) || lsAmountUsd < 12 || lsAmountUsd > 5000) {
-            return NextResponse.json({ error: 'Amount must be between $12 and $5,000' }, { status: 400 })
+        if (!Number.isFinite(lsAmountUsd) || lsAmountUsd < 0 || lsAmountUsd > 5000) {
+            return NextResponse.json({ error: 'Amount must be between $0 and $5,000' }, { status: 400 })
         }
         const lsAmountCents = Math.round(lsAmountUsd * 100)
         
@@ -70,8 +70,8 @@ export async function POST(request: NextRequest) {
     // FIX: amount comes from the founder (min ₹1,000, max ₹5,00,000) — the old
     // hardcoded ₹10,000 could charge a founder 10x what the button promised.
     const amountINR = Number(amount)
-    if (!Number.isFinite(amountINR) || amountINR < 1000 || amountINR > 500000) {
-        return NextResponse.json({ error: 'Amount must be between ₹1,000 and ₹5,00,000' }, { status: 400 })
+    if (!Number.isFinite(amountINR) || amountINR < 0 || amountINR > 500000) {
+        return NextResponse.json({ error: 'Amount must be between ₹0 and ₹5,00,000' }, { status: 400 })
     }
     const depositAmountINR = Math.round(amountINR * 100) // rupees → paise
     try {

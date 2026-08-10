@@ -17,10 +17,9 @@ import { createClient } from "@/lib/supabase"
 import { useConfirm } from "@/components/confirm-provider"
 import { toast } from "sonner"
 
-// Admin emails - only these users can access admin dashboard
-const ADMIN_EMAILS = [
-    "aryansharma24112003@gmail.com"
-]
+// Admin access is decided SERVER-SIDE by /api/admin/data (env ADMIN_EMAILS).
+// No hardcoded email list here — otherwise admins added via env could use the
+// APIs but be locked out of this UI.
 
 type AdminTab = "products" | "users"
 
@@ -52,23 +51,25 @@ export default function AdminDashboard() {
     const [isLoading, setIsLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
     const [togglingId, setTogglingId] = useState<string | null>(null)
+    const [isAdmin, setIsAdmin] = useState(false)
 
-    // Check if user is admin
-    const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email)
-
-    // Fetch data
+    // Fetch data + verify admin server-side (env ADMIN_EMAILS)
     useEffect(() => {
         async function fetchData() {
-            if (!user || !isAdmin) return
+            if (!user) return
 
             try {
-                // Use admin API to bypass RLS and get all data
+                // Use admin API to bypass RLS and get all data.
+                // 200 = admin (env), 403 = not admin. Single source of truth.
                 const response = await fetch('/api/admin/data')
-                const data = await response.json()
 
                 if (response.ok) {
+                    setIsAdmin(true)
+                    const data = await response.json()
                     setProducts(data.products || [])
                     setUsers(data.users || [])
+                } else {
+                    setIsAdmin(false)
                 }
             } catch (err) {
                 console.error('Failed to fetch admin data:', err)
@@ -77,12 +78,12 @@ export default function AdminDashboard() {
             setIsLoading(false)
         }
 
-        if (user && isAdmin) {
+        if (user && !authLoading) {
             fetchData()
         } else if (!authLoading) {
             setIsLoading(false)
         }
-    }, [user, isAdmin, authLoading])
+    }, [user, authLoading])
 
     const toggleFoundersChoice = async (product: Product) => {
         setTogglingId(product.id)

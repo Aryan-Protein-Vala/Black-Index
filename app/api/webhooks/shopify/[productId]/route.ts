@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { processRefund } from '@/lib/webhook-processor'
 import { convertMinorToINRPaise } from '@/lib/fx'
+import { emailsMatch } from '@/lib/anti-fraud'
 import crypto from 'crypto'
 
 function verifyShopifyHmac(body: string, secret: string, hmac: string): boolean {
@@ -74,8 +75,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 (buyerPhone && sellerPhone && buyerPhone === sellerPhone) ||
                 (buyerPhone && sellerVpa && buyerPhone === sellerVpa)
 
-            if ((buyerEmail && sellerEmail && buyerEmail.toLowerCase() === sellerEmail.toLowerCase()) ||
-                phoneMatches) {
+            if (emailsMatch(buyerEmail, sellerEmail) || phoneMatches) {
                 
                 await adminClient.from('fraud_reports').insert({
                     product_id: productId, founder_id: p.founder_id, reporter_id: p.founder_id,

@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { sendEmail } from '@/lib/email'
 import { saleRecordedEmail, founderSaleEmail } from '@/lib/email-templates'
 import { checkVelocityLimits } from '@/lib/velocity-limits'
+import { emailsMatch } from '@/lib/anti-fraud'
 
 /**
  * Shared webhook processor for all payment providers.
@@ -111,9 +112,9 @@ export async function processConversion(
 
         // ================================================
         // STEP 2: SELF-REFERRAL CHECK
+        // (normalized: catches seller+test@gmail.com vs seller@gmail.com)
         // ================================================
-        const sellerEmail = typedLink.seller?.email?.toLowerCase()
-        if (!options.isTest && sellerEmail && customerEmail && sellerEmail === customerEmail.toLowerCase()) {
+        if (!options.isTest && emailsMatch(typedLink.seller?.email, customerEmail)) {
             return { success: false, message: 'Self-referral blocked', error: 'SELF_REFERRAL' }
         }
 

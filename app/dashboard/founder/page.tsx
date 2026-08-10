@@ -882,10 +882,32 @@ function ActivityTab({ transactions, isLoading, fetchError, onRetry }: { transac
 // ============================================
 function SettingsTab({ profile, signOut }: { profile: any; signOut: () => void }) {
     const [saved, setSaved] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [displayName, setDisplayName] = useState(profile?.full_name || "")
+    const [username, setUsername] = useState(profile?.username || "")
 
-    const handleSave = () => {
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
+    const handleSave = async () => {
+        setIsSaving(true)
+        try {
+            const response = await fetch("/api/profile", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    full_name: displayName.trim() || null,
+                    username: username.trim() || null,
+                }),
+            })
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.error || "Failed to save")
+            }
+            setSaved(true)
+            setTimeout(() => setSaved(false), 2000)
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to save profile")
+        } finally {
+            setIsSaving(false)
+        }
     }
 
     return (
@@ -899,14 +921,16 @@ function SettingsTab({ profile, signOut }: { profile: any; signOut: () => void }
                         <div>
                             <label className="text-xs font-light text-muted-foreground mb-2 block">Display Name</label>
                             <Input
-                                defaultValue={profile?.full_name || ""}
+                                value={displayName}
+                                onChange={(e) => setDisplayName(e.target.value)}
                                 className="h-12 bg-background/50 border-border/50 text-sm font-light focus:border-foreground/30"
                             />
                         </div>
                         <div>
                             <label className="text-xs font-light text-muted-foreground mb-2 block">Username</label>
                             <Input
-                                defaultValue={profile?.username || ""}
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
                                 placeholder="your-username"
                                 className="h-12 bg-background/50 border-border/50 text-sm font-light focus:border-foreground/30"
                             />
@@ -922,9 +946,10 @@ function SettingsTab({ profile, signOut }: { profile: any; signOut: () => void }
             >
                 <Button
                     onClick={handleSave}
+                    disabled={isSaving}
                     className="w-full h-12 text-sm font-light bg-foreground text-background hover:bg-foreground/90"
                 >
-                    {saved ? "Saved Successfully" : "Save Changes"}
+                    {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : saved ? "Saved Successfully" : "Save Changes"}
                 </Button>
             </motion.div>
 

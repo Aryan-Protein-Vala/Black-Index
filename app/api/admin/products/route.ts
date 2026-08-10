@@ -71,29 +71,27 @@ export async function POST(request: NextRequest) {
             }
 
             case 'delete': {
-                // First delete related links
-                await supabase
-                    .from('links')
-                    .delete()
-                    .eq('product_id', productId)
-
-                // Delete related transactions
-                await supabase
-                    .from('transactions')
-                    .delete()
-                    .eq('product_id', productId)
-
-                // Then delete the product
+                // SOFT delete: hide from listings + null out sensitive fields,
+                // but KEEP the row so financial transactions keep their FK and
+                // the audit trail survives (hard-deleting transactions would
+                // destroy escrow history required for accounting/compliance).
                 const { error } = await supabase
                     .from('products')
-                    .delete()
+                    .update({
+                        is_active: false,
+                        name: `[DELETED] ${typedProduct.name}`,
+                        description: null,
+                        website_url: `https://blackindex.in/deleted/${productId}`,
+                        verified_at: null,
+                        auto_paused: true,
+                    } as never)
                     .eq('id', productId)
 
                 if (error) throw error
 
                 return NextResponse.json({
                     success: true,
-                    message: `Product "${typedProduct.name}" deleted`
+                    message: `Product "${typedProduct.name}" removed from listings (records preserved)`
                 })
             }
 

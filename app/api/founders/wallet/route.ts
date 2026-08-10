@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient()
     const body = await request.json()
-    const { currency, user_id } = body
+    const { currency, user_id, amount } = body
 
     // SECURITY: user_id from body must match authenticated user (if provided)
     if (user_id && user_id !== user.id) {
@@ -30,7 +30,11 @@ export async function POST(request: NextRequest) {
 
     // If USD, generate Lemon Squeezy Checkout
     if (currency === 'USD') {
-        const lsAmountCents = 12000 // $120.00
+        const lsAmountUsd = Number(amount) || 120
+        if (!Number.isFinite(lsAmountUsd) || lsAmountUsd < 12 || lsAmountUsd > 5000) {
+            return NextResponse.json({ error: 'Amount must be between $12 and $5,000' }, { status: 400 })
+        }
+        const lsAmountCents = Math.round(lsAmountUsd * 100)
         
         try {
             const lsRes = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
@@ -63,7 +67,13 @@ export async function POST(request: NextRequest) {
     }
 
     // If INR, generate Razorpay Order
-    const depositAmountINR = 1000000 // ₹10,000 in paise
+    // FIX: amount comes from the founder (min ₹1,000, max ₹5,00,000) — the old
+    // hardcoded ₹10,000 could charge a founder 10x what the button promised.
+    const amountINR = Number(amount)
+    if (!Number.isFinite(amountINR) || amountINR < 1000 || amountINR > 500000) {
+        return NextResponse.json({ error: 'Amount must be between ₹1,000 and ₹5,00,000' }, { status: 400 })
+    }
+    const depositAmountINR = Math.round(amountINR * 100) // rupees → paise
     try {
         const razorpay = new Razorpay({
             key_id: process.env.RAZORPAY_KEY_ID!,

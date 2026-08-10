@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { processRefund } from '@/lib/webhook-processor'
+import { emailsMatch } from '@/lib/anti-fraud'
 import crypto from 'crypto'
 
 function sigInvalid(a: string, b: string): boolean {
@@ -98,8 +99,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 (attendeePhone && sellerPhone && attendeePhone === sellerPhone) ||
                 (attendeePhone && sellerVpa && attendeePhone === sellerVpa)
 
-            if ((attendeeEmail && sellerEmail && attendeeEmail.toLowerCase() === sellerEmail.toLowerCase()) ||
-                phoneMatches) {
+            if (emailsMatch(attendeeEmail, sellerEmail) || phoneMatches) {
                 
                 // Flag fraud
                 await adminClient.from('fraud_reports').insert({

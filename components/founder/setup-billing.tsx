@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react"
 import { CreditCard, Shield, Check, ExternalLink, Loader2, Crown, Wallet, Plus, Globe, MapPin, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { SpotlightCard } from "@/components/ui/spotlight-card"
 import { useAuth } from "@/components/auth-provider"
 import { toast } from "sonner"
@@ -16,6 +18,7 @@ export function SetupBilling() {
     const [isLoading, setIsLoading] = useState(false)
     const [isDepositingWallet, setIsDepositingWallet] = useState(false)
     const [walletBalance, setWalletBalance] = useState(0)
+    const [topupAmount, setTopupAmount] = useState("1000")
 
     // For statement table
     const [transactions, setTransactions] = useState<any[]>([])
@@ -58,6 +61,11 @@ export function SetupBilling() {
 
     const handleDepositWallet = async () => {
         if (!user) return
+        const depositAmount = parseFloat(topupAmount)
+        if (!depositAmount || depositAmount < (region === 'india' ? 1000 : 12)) {
+            toast.error(region === 'india' ? "Minimum deposit is ₹1,000" : "Minimum deposit is $12")
+            return
+        }
         setIsDepositingWallet(true)
         const currency = region === 'india' ? 'INR' : 'USD'
         
@@ -65,7 +73,7 @@ export function SetupBilling() {
             const res = await fetch("/api/founders/wallet", { 
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: user.id, currency })
+                body: JSON.stringify({ user_id: user.id, currency, amount: depositAmount })
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Failed to initiate deposit")
@@ -160,8 +168,26 @@ export function SetupBilling() {
                             </p>
                         )}
                     </div>
+                    <div className="space-y-2 mb-3">
+                        <Label htmlFor="topup-amount" className="text-xs text-muted-foreground">
+                            Deposit Amount ({region === 'india' ? '₹' : '$'})
+                        </Label>
+                        <Input
+                            id="topup-amount"
+                            type="number"
+                            min={region === 'india' ? 1000 : 12}
+                            max={region === 'india' ? 500000 : 5000}
+                            step={region === 'india' ? 100 : 1}
+                            value={topupAmount}
+                            onChange={(e) => setTopupAmount(e.target.value)}
+                            className="h-11 bg-input/30"
+                        />
+                        <p className="text-[10px] text-muted-foreground">
+                            Min {region === 'india' ? '₹1,000' : '$12'} · Max {region === 'india' ? '₹5,00,000' : '$5,000'}
+                        </p>
+                    </div>
                     <Button onClick={handleDepositWallet} disabled={isDepositingWallet} className="w-full bg-emerald-500 text-black hover:bg-emerald-600">
-                        {isDepositingWallet ? "Processing..." : `Add Funds (Min ${region === 'india' ? '₹1,000' : '$12'})`}
+                        {isDepositingWallet ? "Processing..." : `Add Funds (${region === 'india' ? '₹' : '$'}${topupAmount || '—'})`}
                     </Button>
                 </SpotlightCard>
 

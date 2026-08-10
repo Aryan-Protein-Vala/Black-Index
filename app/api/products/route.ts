@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
 
         // The 'enforce_product_defaults' Postgres trigger overwrites the webhook_secret on insert
         // We MUST return the database-generated secret, not our local one.
-        const actualWebhookSecret = product.webhook_secret || webhookSecret
+        const actualWebhookSecret = (product as { webhook_secret?: string })?.webhook_secret || webhookSecret
 
         return NextResponse.json({
             product,

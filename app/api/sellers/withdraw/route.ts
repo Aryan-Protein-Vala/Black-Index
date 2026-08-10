@@ -154,10 +154,10 @@ export async function POST(request: NextRequest) {
             console.error('Payout creation failed, restoring balance:', payoutError)
             
             // Restore balance and mark transaction as failed
-            await adminClient.rpc('process_payout', {
+            await adminClient.rpc('process_payout' as never, {
                 p_seller_id: user.id,
                 p_amount: -amount // process_payout subtracts, so negative restores it
-            })
+            } as never)
 
             await adminClient
                 .from('transactions')

@@ -60,9 +60,9 @@ export async function GET(request: NextRequest) {
         for (const txn of clearedTransactions as any[]) {
             try {
                 // Call atomic RPC: updates transaction status AND credits seller wallet inside a single lock
-                const { error: rpcError } = await supabase.rpc('release_transaction_escrow', {
+                const { error: rpcError } = await supabase.rpc('release_transaction_escrow' as never, {
                     p_transaction_id: txn.id
-                })
+                } as never)
 
                 if (rpcError) {
                     console.error('[ESCROW RELEASE] RPC failed for transaction', txn.id, rpcError.message)
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
             success: true,
             message: 'Escrow release completed',
             sellers_updated: successCount,
-            transactions_cleared: transactionIds.length,
+            transactions_cleared: successCount,
             total_released: totalReleased / 100 // ₹
         })
 

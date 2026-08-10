@@ -42,18 +42,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Get deposit record to find amount
-    const { data: deposit } = await supabase
+    const { data: deposit, error: depositError } = await supabase
         .from('founder_deposits')
-        .select('amount, status')
+        .select('id, amount, status')
         .eq('order_id', razorpay_order_id)
         .eq('founder_id', verifiedUserId)
         .single()
 
     if (!deposit) {
-        return NextResponse.json({ error: 'Deposit record not found' }, { status: 404 })
+        return NextResponse.json({ error: 'Deposit not found' }, { status: 404 })
     }
 
-    const typedDeposit = deposit as { amount: number; status: string }
+    const typedDeposit = deposit as { id: string; amount: number; status: string }
 
     // Idempotency: don't credit twice
     if (typedDeposit.status === 'completed') {
@@ -64,10 +64,10 @@ export async function POST(request: NextRequest) {
 
     // Credit wallet using atomic SQL increment and mark deposit completed in one transaction
     // This avoids read-then-write race conditions and double-crediting
-    const { error: creditError } = await supabase.rpc('credit_founder_wallet_atomic', {
+    const { error: creditError } = await supabase.rpc('credit_founder_wallet_atomic' as never, {
         p_deposit_id: typedDeposit.id,
         p_payment_id: razorpay_payment_id,
-    })
+    } as never)
 
     if (creditError) {
         console.error('Failed to credit wallet via RPC:', creditError)

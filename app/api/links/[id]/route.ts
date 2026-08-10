@@ -7,9 +7,10 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
  */
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await context.params
         const supabase = await createServerSupabaseClient()
         const { data: { user } } = await supabase.auth.getUser()
 
@@ -17,7 +18,7 @@ export async function DELETE(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { id } = params
+
         if (!id) {
             return NextResponse.json({ error: 'Link ID is required' }, { status: 400 })
         }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowLeft, ArrowRight, Loader2, Shield, Copy, Check, CreditCard, ExternalLink } from "lucide-react"
+import { ArrowLeft, ArrowRight, Loader2, Shield, Copy, Check, CreditCard, ExternalLink, Key } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -35,6 +35,9 @@ export default function NewProductPage() {
     const [webhookSecret, setWebhookSecret] = useState<string | null>(null)
     const [copied, setCopied] = useState<"secret" | "url" | null>(null)
     const [selectedProvider, setSelectedProvider] = useState<PaymentProvider | null>(null)
+    const [showMoreProviders, setShowMoreProviders] = useState(false)
+    const [customSecret, setCustomSecret] = useState("")
+    const [isSavingSecret, setIsSavingSecret] = useState(false)
 
     // Form fields
     const [name, setName] = useState("")
@@ -153,6 +156,28 @@ export default function NewProductPage() {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://blackindex.in"
         return `${baseUrl}/api/webhooks/${selectedProvider}/${createdProductId}`
     }
+
+    const handleSaveCustomSecret = async () => {
+        if (!customSecret.trim() || !createdProductId) return
+        setIsSavingSecret(true)
+        try {
+            const response = await fetch(`/api/products/${createdProductId}/webhook-secret`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ secret: customSecret.trim() }),
+            })
+            const data = await response.json()
+            if (!response.ok) throw new Error(data.error || "Failed to save secret")
+            toast.success("Secret saved successfully!")
+            setWebhookSecret(customSecret.trim()) // Update local state so it shows in the UI if needed
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to save secret")
+        } finally {
+            setIsSavingSecret(false)
+        }
+    }
+
+    const needsCustomSecret = selectedProvider && ['stripe', 'cashfree', 'phonepe', 'payu', 'instamojo', 'ccavenue'].includes(selectedProvider)
 
     // Step 1: Product Details Form
     if (step === 1) {
@@ -429,24 +454,55 @@ export default function NewProductPage() {
                     <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
                         Select Your Payment Provider
                     </h3>
-                    <select
-                        value={selectedProvider || ""}
-                        onChange={(e) => setSelectedProvider(e.target.value as PaymentProvider)}
-                        className="w-full bg-black/50 border border-border/50 rounded-xl p-4 text-sm text-foreground outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                    >
-                        <option value="" disabled>Select a payment gateway</option>
-                        <option value="razorpay">Razorpay</option>
-                        <option value="stripe">Stripe</option>
-                        <option value="lemonsqueezy">Lemon Squeezy</option>
-                        <option value="gumroad">Gumroad</option>
-                        <option value="paypal">PayPal</option>
-                        <option value="cashfree">Cashfree</option>
-                        <option value="phonepe">PhonePe</option>
-                        <option value="payu">PayU</option>
-                        <option value="instamojo">Instamojo</option>
-                        <option value="ccavenue">CCAvenue</option>
-                        <option value="shopflo">Shopflo</option>
-                    </select>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {paymentProviders.map((provider) => (
+                            <button
+                                key={provider.id}
+                                onClick={() => {
+                                    setSelectedProvider(provider.id)
+                                    setShowMoreProviders(false)
+                                }}
+                                className={cn(
+                                    "p-4 rounded-xl border text-left transition-all",
+                                    selectedProvider === provider.id && !showMoreProviders
+                                        ? "border-foreground/50 bg-foreground/5"
+                                        : "border-border/50 hover:border-border"
+                                )}
+                            >
+                                <p className="font-light text-sm">{provider.name}</p>
+                                <p className="text-xs text-muted-foreground">{provider.description}</p>
+                            </button>
+                        ))}
+                        <button
+                            onClick={() => setShowMoreProviders(true)}
+                            className={cn(
+                                "p-4 rounded-xl border text-left transition-all flex flex-col justify-center",
+                                showMoreProviders
+                                    ? "border-foreground/50 bg-foreground/5"
+                                    : "border-border/50 hover:border-border"
+                            )}
+                        >
+                            <p className="font-light text-sm">More Gateways</p>
+                            <p className="text-xs text-muted-foreground">Cashfree, PhonePe, PayU...</p>
+                        </button>
+                    </div>
+                    {showMoreProviders && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-4">
+                            <select
+                                value={['razorpay', 'stripe', 'lemonsqueezy', 'gumroad', 'paypal'].includes(selectedProvider || "") ? "" : (selectedProvider || "")}
+                                onChange={(e) => setSelectedProvider(e.target.value as PaymentProvider)}
+                                className="w-full bg-black/50 border border-border/50 rounded-xl p-4 text-sm text-foreground outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+                            >
+                                <option value="" disabled>Select an Indian Gateway...</option>
+                                <option value="cashfree">Cashfree</option>
+                                <option value="phonepe">PhonePe</option>
+                                <option value="payu">PayU</option>
+                                <option value="instamojo">Instamojo</option>
+                                <option value="ccavenue">CCAvenue</option>
+                                <option value="shopflo">Shopflo</option>
+                            </select>
+                        </motion.div>
+                    )}
                 </div>
 
                 {selectedProvider && (
@@ -472,18 +528,56 @@ export default function NewProductPage() {
                             </div>
                         </SpotlightCard>
 
-                        {/* Webhook Secret */}
+                        {/* Webhook Secret (Conditional) */}
                         <SpotlightCard className="p-5">
-                            <h3 className="font-medium mb-2">Webhook Secret</h3>
-                            <p className="text-sm text-muted-foreground mb-3">
-                                You configured this secret during product creation. Use it in your provider dashboard.
-                            </p>
-                            <div className="flex items-center gap-2 p-3 bg-muted/20 rounded-lg">
-                                <code className="flex-1 text-xs font-mono break-all">{webhookSecret}</code>
-                                <Button size="sm" variant="ghost" onClick={() => handleCopy(webhookSecret || "", "secret")}>
-                                    {copied === "secret" ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                                </Button>
-                            </div>
+                            <h3 className="font-medium mb-2 flex items-center gap-2">
+                                <Key className="w-4 h-4" />
+                                Webhook Secret
+                            </h3>
+                            {needsCustomSecret ? (
+                                <div className="space-y-3">
+                                    <p className="text-sm text-muted-foreground">
+                                        For <strong>{selectedProvider}</strong>, you need to provide your API Secret/Salt Key from their dashboard so we can verify the webhooks.
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            type="password"
+                                            placeholder="Paste your Secret/Salt here..."
+                                            value={customSecret}
+                                            onChange={(e) => setCustomSecret(e.target.value)}
+                                            className="font-mono text-sm bg-black/50"
+                                        />
+                                        <Button 
+                                            onClick={handleSaveCustomSecret} 
+                                            disabled={!customSecret || isSavingSecret}
+                                        >
+                                            {isSavingSecret ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <p className="text-sm text-muted-foreground">
+                                        You configured this secret during product creation. Use it in your provider dashboard.
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 p-3 rounded-lg bg-black/50 border border-border/50 font-mono text-sm text-muted-foreground break-all">
+                                            {webhookSecret}
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(webhookSecret || "")
+                                                setCopied("secret")
+                                                setTimeout(() => setCopied(null), 2000)
+                                            }}
+                                        >
+                                            {copied === "secret" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </SpotlightCard>
 
                         {/* Provider-specific instructions */}
@@ -533,15 +627,6 @@ export default function NewProductPage() {
                                     <li>Navigate to My Apps → Webhooks</li>
                                     <li>Create a webhook with the URL above</li>
                                     <li>Select events: <code className="text-xs bg-muted/50 px-1 rounded">PAYMENT.SALE.COMPLETED</code> or <code className="text-xs bg-muted/50 px-1 rounded">PAYMENT.CAPTURE.COMPLETED</code></li>
-                                </ol>
-                            )}
-                            {['cashfree', 'phonepe', 'payu', 'instamojo', 'ccavenue', 'shopflo'].includes(selectedProvider || "") && (
-                                <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                                    <li>Go to your {selectedProvider} Dashboard</li>
-                                    <li>Find Webhook Settings (usually under Developer/API)</li>
-                                    <li>Add a new Webhook endpoint using the URL above</li>
-                                    <li>Subscribe to successful payment / order events</li>
-                                    <li>Ensure your API Secret/Salt is correctly configured in the Black Index Edit Product page.</li>
                                 </ol>
                             )}
                             <p className="mt-4 text-xs text-muted-foreground">

@@ -2,11 +2,13 @@
 
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, UserPlus, LogIn } from "lucide-react"
+import { ArrowRight, UserPlus, LogIn, LayoutDashboard } from "lucide-react"
 import { FadeInSection } from "@/components/ui/fade-in-section"
 import Link from "next/link"
+import { useAuth } from "@/components/auth-provider"
 
 export function JoinSection() {
+  const { user } = useAuth()
   return (
     <FadeInSection>
       <section id="join" className="min-h-screen flex items-center justify-center px-6 lg:px-12">
@@ -49,23 +51,34 @@ export function JoinSection() {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-col sm:flex-row gap-4 justify-center items-center"
           >
-            <Link href="/signup">
-              <Button className="h-12 px-8 text-sm font-normal tracking-tight bg-foreground text-background hover:bg-foreground/90 transition-all duration-300 group shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_30px_rgba(255,255,255,0.1)]">
-                <UserPlus className="mr-2 w-4 h-4" />
-                Create Account
-                <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button
-                variant="outline"
-                className="h-12 px-8 text-sm font-normal tracking-tight border-border/50 hover:bg-foreground/5 transition-all duration-300 group bg-transparent"
-              >
-                <LogIn className="mr-2 w-4 h-4" />
-                Sign In
-                <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-              </Button>
-            </Link>
+            {user ? (
+              <Link href="/dashboard">
+                <Button className="h-12 px-8 text-sm font-normal tracking-tight bg-foreground text-background hover:bg-foreground/90 transition-all duration-300 group shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                  Go to Dashboard
+                  <LayoutDashboard className="ml-2 w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link href="/signup">
+                  <Button className="h-12 px-8 text-sm font-normal tracking-tight bg-foreground text-background hover:bg-foreground/90 transition-all duration-300 group shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                    <UserPlus className="mr-2 w-4 h-4" />
+                    Create Account
+                    <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+                  </Button>
+                </Link>
+                <Link href="/login">
+                  <Button
+                    variant="outline"
+                    className="h-12 px-8 text-sm font-normal tracking-tight border-border/50 hover:bg-foreground/5 transition-all duration-300 group bg-transparent"
+                  >
+                    <LogIn className="mr-2 w-4 h-4" />
+                    Sign In
+                    <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+                  </Button>
+                </Link>
+              </>
+            )}
           </motion.div>
 
           <motion.p

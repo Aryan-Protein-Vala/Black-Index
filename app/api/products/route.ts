@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
 
         if (insertError) {
             console.error('Failed to create product:', insertError)
-            return NextResponse.json({ error: 'Failed to create product' }, { status: 500 })
+            return NextResponse.json({ error: `Failed to create product: ${insertError.message}` }, { status: 500 })
         }
 
         return NextResponse.json({

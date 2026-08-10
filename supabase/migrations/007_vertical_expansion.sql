@@ -415,7 +415,8 @@ create policy "Founder can view tx evidence"
   using (
     exists (
       select 1 from public.transactions t
-      where t.id = transaction_id and t.founder_id = auth.uid()
+      join public.products p on t.product_id = p.id
+      where t.id = transaction_id and p.founder_id = auth.uid()
     )
   );
 
@@ -436,7 +437,8 @@ create policy "Uploader can insert evidence"
     uploaded_by = auth.uid() and
     exists (
       select 1 from public.transactions t
-      where t.id = transaction_id and (t.founder_id = auth.uid() or t.seller_id = auth.uid())
+      join public.products p on t.product_id = p.id
+      where t.id = transaction_id and (p.founder_id = auth.uid() or t.seller_id = auth.uid())
     )
   );
 
@@ -533,7 +535,7 @@ begin
 
   -- Log Transaction
   insert into public.transactions (
-    type, status, billing_status, product_id, link_id, seller_id, founder_id,
+    type, status, billing_status, product_id, link_id, seller_id,
     external_customer_id, external_transaction_id,
     sale_amount, commission_amount, platform_fee,
     currency, amount_minor, fx_rate,
@@ -545,7 +547,6 @@ begin
     p_product_id,
     p_link_id,
     p_seller_id,
-    v_product.founder_id,
     p_buyer_email,
     p_cal_booking_uid,
     v_commission,

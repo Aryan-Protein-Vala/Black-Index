@@ -81,7 +81,6 @@ export async function POST(
             const externalCustomerId = data?.paymentInstrument?.email || merchantTransactionId
             const externalTransactionId = data?.transactionId
             const amountPaise = data?.amount || 0
-            const amount = amountPaise / 100
             const customerEmail = data?.paymentInstrument?.email || ''
 
             if (!refId) {
@@ -95,7 +94,7 @@ export async function POST(
                 refId,
                 externalCustomerId,
                 externalTransactionId,
-                amount,
+                amount: amountPaise,
                 customerEmail,
                 provider: 'phonepe',
                 rawPayload: payload,

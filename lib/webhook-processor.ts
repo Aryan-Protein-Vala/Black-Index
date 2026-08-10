@@ -24,7 +24,7 @@ interface ConversionData {
     externalTransactionId: string
     amount: number // in INR paise (already FX-converted at the route edge)
     customerEmail: string
-    provider: 'razorpay' | 'stripe' | 'gumroad' | 'lemonsqueezy' | 'paypal' | 'custom'
+    provider: 'razorpay' | 'stripe' | 'gumroad' | 'lemonsqueezy' | 'paypal' | 'custom' | 'cashfree' | 'phonepe' | 'payu' | 'instamojo' | 'ccavenue' | 'shopflo'
     rawPayload?: any
     currency?: string
     amountMinor?: number // original minor units (e.g. USD cents)

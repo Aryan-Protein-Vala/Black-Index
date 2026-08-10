@@ -76,7 +76,8 @@ export async function POST(
 
             const externalCustomerId = data?.customer_details?.customer_id || data?.customer_details?.customer_email
             const externalTransactionId = data?.payment?.cf_payment_id?.toString() || data?.order?.order_id
-            const amount = data?.order?.order_amount || 0
+            const amountRupees = data?.order?.order_amount || 0
+            const amountPaise = Math.round(amountRupees * 100)
             const customerEmail = data?.customer_details?.customer_email || ''
 
             if (!refId) {
@@ -90,12 +91,12 @@ export async function POST(
                 refId,
                 externalCustomerId,
                 externalTransactionId,
-                amount,
+                amount: amountPaise,
                 customerEmail,
                 provider: 'cashfree',
                 rawPayload: payload,
                 currency: data?.order?.order_currency || 'INR',
-                amountMinor: amount * 100, // Assuming order_amount is in INR not paise. If Cashfree sends it in INR, amountMinor is amount * 100
+                amountMinor: amountPaise,
                 fxRate: 1,
             })
 

@@ -91,7 +91,8 @@ export async function POST(
 
             const externalCustomerId = payload.buyer || payload.payment_id
             const externalTransactionId = payload.payment_id
-            const amount = parseFloat(payload.amount || '0')
+            const amountRupees = parseFloat(payload.amount || '0')
+            const amountPaise = Math.round(amountRupees * 100)
             const customerEmail = payload.buyer || ''
 
             if (!refId) {
@@ -105,12 +106,12 @@ export async function POST(
                 refId,
                 externalCustomerId,
                 externalTransactionId,
-                amount,
+                amount: amountPaise,
                 customerEmail,
                 provider: 'instamojo',
                 rawPayload: payload,
                 currency: payload.currency || 'INR',
-                amountMinor: Math.round(amount * 100),
+                amountMinor: amountPaise,
                 fxRate: 1,
             })
 

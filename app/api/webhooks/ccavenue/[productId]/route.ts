@@ -80,7 +80,8 @@ export async function POST(
             const refId = payload.merchant_param1
             const externalCustomerId = payload.billing_email || payload.tracking_id
             const externalTransactionId = payload.tracking_id
-            const amount = parseFloat(payload.amount || '0')
+            const amountRupees = parseFloat(payload.amount || '0')
+            const amountPaise = Math.round(amountRupees * 100)
             const customerEmail = payload.billing_email || ''
 
             if (!refId) {
@@ -94,12 +95,12 @@ export async function POST(
                 refId,
                 externalCustomerId,
                 externalTransactionId,
-                amount,
+                amount: amountPaise,
                 customerEmail,
                 provider: 'ccavenue',
                 rawPayload: payload,
                 currency: payload.currency || 'INR',
-                amountMinor: Math.round(amount * 100),
+                amountMinor: amountPaise,
                 fxRate: 1,
             })
 

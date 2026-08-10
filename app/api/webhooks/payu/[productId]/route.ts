@@ -74,7 +74,8 @@ export async function POST(
             const refId = payload.udf1
             const externalCustomerId = payload.email || payload.txnid
             const externalTransactionId = payload.txnid
-            const amount = parseFloat(payload.amount || '0')
+            const amountRupees = parseFloat(payload.amount || '0')
+            const amountPaise = Math.round(amountRupees * 100)
             const customerEmail = payload.email || ''
 
             if (!refId) {
@@ -88,12 +89,12 @@ export async function POST(
                 refId,
                 externalCustomerId,
                 externalTransactionId,
-                amount,
+                amount: amountPaise,
                 customerEmail,
                 provider: 'payu',
                 rawPayload: payload,
                 currency: 'INR',
-                amountMinor: Math.round(amount * 100),
+                amountMinor: amountPaise,
                 fxRate: 1,
             })
 

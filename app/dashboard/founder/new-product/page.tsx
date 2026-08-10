@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
-type PaymentProvider = "razorpay" | "stripe" | "lemonsqueezy" | "gumroad" | "paypal"
+type PaymentProvider = "razorpay" | "stripe" | "lemonsqueezy" | "gumroad" | "paypal" | "cashfree" | "phonepe" | "payu" | "instamojo" | "ccavenue" | "shopflo"
 
 const paymentProviders = [
     { id: "razorpay" as const, name: "Razorpay", description: "Most popular in India", color: "blue" },
@@ -429,23 +429,24 @@ export default function NewProductPage() {
                     <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
                         Select Your Payment Provider
                     </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {paymentProviders.map((provider) => (
-                            <button
-                                key={provider.id}
-                                onClick={() => setSelectedProvider(provider.id)}
-                                className={cn(
-                                    "p-4 rounded-xl border text-left transition-all",
-                                    selectedProvider === provider.id
-                                        ? "border-foreground/50 bg-foreground/5"
-                                        : "border-border/50 hover:border-border"
-                                )}
-                            >
-                                <p className="font-light text-sm">{provider.name}</p>
-                                <p className="text-xs text-muted-foreground">{provider.description}</p>
-                            </button>
-                        ))}
-                    </div>
+                    <select
+                        value={selectedProvider || ""}
+                        onChange={(e) => setSelectedProvider(e.target.value as PaymentProvider)}
+                        className="w-full bg-black/50 border border-border/50 rounded-xl p-4 text-sm text-foreground outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+                    >
+                        <option value="" disabled>Select a payment gateway</option>
+                        <option value="razorpay">Razorpay</option>
+                        <option value="stripe">Stripe</option>
+                        <option value="lemonsqueezy">Lemon Squeezy</option>
+                        <option value="gumroad">Gumroad</option>
+                        <option value="paypal">PayPal</option>
+                        <option value="cashfree">Cashfree</option>
+                        <option value="phonepe">PhonePe</option>
+                        <option value="payu">PayU</option>
+                        <option value="instamojo">Instamojo</option>
+                        <option value="ccavenue">CCAvenue</option>
+                        <option value="shopflo">Shopflo</option>
+                    </select>
                 </div>
 
                 {selectedProvider && (
@@ -532,6 +533,15 @@ export default function NewProductPage() {
                                     <li>Navigate to My Apps → Webhooks</li>
                                     <li>Create a webhook with the URL above</li>
                                     <li>Select events: <code className="text-xs bg-muted/50 px-1 rounded">PAYMENT.SALE.COMPLETED</code> or <code className="text-xs bg-muted/50 px-1 rounded">PAYMENT.CAPTURE.COMPLETED</code></li>
+                                </ol>
+                            )}
+                            {['cashfree', 'phonepe', 'payu', 'instamojo', 'ccavenue', 'shopflo'].includes(selectedProvider || "") && (
+                                <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                                    <li>Go to your {selectedProvider} Dashboard</li>
+                                    <li>Find Webhook Settings (usually under Developer/API)</li>
+                                    <li>Add a new Webhook endpoint using the URL above</li>
+                                    <li>Subscribe to successful payment / order events</li>
+                                    <li>Ensure your API Secret/Salt is correctly configured in the Black Index Edit Product page.</li>
                                 </ol>
                             )}
                             <p className="mt-4 text-xs text-muted-foreground">

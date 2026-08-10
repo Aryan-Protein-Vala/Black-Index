@@ -62,8 +62,8 @@ export function SetupBilling() {
     const handleDepositWallet = async () => {
         if (!user) return
         const depositAmount = parseFloat(topupAmount)
-        if (!depositAmount || depositAmount < (region === 'india' ? 1000 : 12)) {
-            toast.error(region === 'india' ? "Minimum deposit is ₹1,000" : "Minimum deposit is $12")
+        if (isNaN(depositAmount) || depositAmount < 0) {
+            toast.error(region === 'india' ? "Minimum deposit is ₹0" : "Minimum deposit is $0")
             return
         }
         setIsDepositingWallet(true)

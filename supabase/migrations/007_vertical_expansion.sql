@@ -361,7 +361,7 @@ begin
 
   if _role <> 'service_role' then
     if tg_op = 'INSERT' then
-      new.webhook_secret := encode(gen_random_bytes(32), 'hex');
+      new.webhook_secret := encode(extensions.gen_random_bytes(32), 'hex');
       new.is_featured := false;
       new.is_founders_choice := false;
       new.featured_until := null;

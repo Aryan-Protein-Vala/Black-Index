@@ -1,7 +1,5 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Inter } from "next/font/google"
-
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "sonner"
 import "./globals.css"
@@ -9,12 +7,6 @@ import { ScrollToTop } from "@/components/scroll-to-top"
 import { AuthProvider } from "@/components/auth-provider"
 import { ConfirmProvider } from "@/components/confirm-provider"
 import Script from "next/script"
-
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-})
-
 
 export const metadata: Metadata = {
   title: {
@@ -133,7 +125,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className={`font-sans antialiased ${inter.className}`}>
+      <body className="font-sans antialiased">
         <AuthProvider>
           <ConfirmProvider>
             <ScrollToTop />

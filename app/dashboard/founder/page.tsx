@@ -1110,6 +1110,8 @@ export default function FounderDashboard() {
 
     return (
         <div className="min-h-screen w-full overflow-x-hidden bg-background">
+            <script src="https://checkout.razorpay.com/v1/checkout.js" async />
+            
             {/* Product Tour Genie */}
             {profile && (
                 <ProductTour 

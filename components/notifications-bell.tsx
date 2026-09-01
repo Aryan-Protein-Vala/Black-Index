@@ -114,14 +114,14 @@ export function NotificationsBell() {
                                         <div
                                             key={n.id}
                                             onClick={() => !n.read && markAsRead(n.id)}
-                                            className={`p-4 border-b border-border/10 hover:bg-foreground/[0.02] cursor-pointer transition-colors ${!n.read ? "bg-foreground/[0.03]" : ""}`}
+                                            className={`group p-4 border-b border-border/10 hover:bg-foreground/[0.02] cursor-pointer transition-colors ${!n.read ? "bg-foreground/[0.03]" : ""}`}
                                         >
                                             <div className="flex justify-between items-start gap-4">
                                                 <div>
                                                     <h4 className={`text-sm ${!n.read ? "font-medium" : "font-light text-muted-foreground"}`}>
                                                         {n.title}
                                                     </h4>
-                                                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2 group-hover:line-clamp-none transition-all duration-200">
                                                         {n.message}
                                                     </p>
                                                     <span className="text-[10px] text-muted-foreground mt-2 block">

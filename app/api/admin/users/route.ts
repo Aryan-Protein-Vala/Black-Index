@@ -84,6 +84,39 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: true, field, before, after })
         }
 
+        if (action === 'send_message') {
+            const { title, message } = body
+            if (!message || message.trim() === '') {
+                return NextResponse.json({ error: 'Message content is required' }, { status: 400 })
+            }
+
+            const notifTitle = title?.trim() || "Message from Admin"
+            const notifMessage = message.trim()
+
+            // 1. Insert into notifications
+            const { error: notifError } = await supabase.from('notifications').insert({
+                user_id: userId,
+                type: 'admin_message',
+                title: notifTitle,
+                message: notifMessage,
+                read: false,
+                metadata: { sender_id: adminId }
+            } as never)
+            if (notifError) throw notifError
+
+            // 2. Log admin action
+            await supabase.from('admin_actions').insert({
+                admin_id: adminId,
+                action: 'send_message',
+                target_type: 'profile',
+                target_id: userId,
+                note: `Sent message to user. Title: ${notifTitle}`,
+                metadata: { title: notifTitle, message: notifMessage },
+            } as never)
+
+            return NextResponse.json({ success: true, title: notifTitle })
+        }
+
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     } catch (error) {
         console.error('Admin user action error:', error)

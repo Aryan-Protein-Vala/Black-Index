@@ -838,6 +838,8 @@ function UsersSection({ users, searchQuery, actionId, runAction, showConfirm }: 
     const [balanceField, setBalanceField] = useState<'pending_balance' | 'withdrawable_balance' | 'wallet_balance'>('withdrawable_balance')
     const [balanceDelta, setBalanceDelta] = useState("")
     const [balanceNote, setBalanceNote] = useState("")
+    const [msgTitle, setMsgTitle] = useState("")
+    const [msgContent, setMsgContent] = useState("")
 
     const filteredByRole = users.filter((u: any) => {
         if (userFilter === 'all') return true
@@ -890,6 +892,22 @@ function UsersSection({ users, searchQuery, actionId, runAction, showConfirm }: 
         if (!confirmed) return
         await runAction('/api/admin/users', { action: 'set_role', userId: selectedUser.id, role: newRole }, 'Role updated')
         setSelectedUser(null)
+    }
+
+    const sendMessage = async () => {
+        if (!selectedUser) return
+        if (!msgContent.trim()) {
+            toast.error("Message content cannot be empty")
+            return
+        }
+        await runAction('/api/admin/users', {
+            action: 'send_message',
+            userId: selectedUser.id,
+            title: msgTitle,
+            message: msgContent
+        }, 'Message sent')
+        setMsgTitle("")
+        setMsgContent("")
     }
 
     return (
@@ -1032,6 +1050,28 @@ function UsersSection({ users, searchQuery, actionId, runAction, showConfirm }: 
                                 />
                                 <Button size="sm" className="w-full" onClick={applyBalance} disabled={actionId === `adjust_balance:${selectedUser.id}`}>
                                     Apply Balance Change
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Send Message */}
+                        <div className="mt-6 pt-6 border-t border-border/30">
+                            <p className="text-xs text-muted-foreground mb-2">Send Message (Notification)</p>
+                            <div className="space-y-2">
+                                <Input
+                                    placeholder="Title (Optional)"
+                                    value={msgTitle}
+                                    onChange={(e) => setMsgTitle(e.target.value)}
+                                    className="bg-input/30"
+                                />
+                                <textarea
+                                    placeholder="Type your message here..."
+                                    value={msgContent}
+                                    onChange={(e) => setMsgContent(e.target.value)}
+                                    className="w-full min-h-[80px] p-3 bg-input/30 border border-border/50 rounded-lg text-sm font-light focus:border-foreground/30 focus:outline-none resize-y"
+                                />
+                                <Button size="sm" className="w-full" onClick={sendMessage} disabled={actionId === 'send_message'}>
+                                    Send Notification
                                 </Button>
                             </div>
                         </div>

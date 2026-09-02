@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://www.blackindex.in/images/logos/index_gold.png" alt="Black Index Logo" width="200"/>
+  <img src="./public/logo.png" alt="Black Index Logo" width="200"/>
   <h1>Black Index</h1>
   <p><strong>The Exclusive Stealth Distribution Network</strong></p>
 </div>
